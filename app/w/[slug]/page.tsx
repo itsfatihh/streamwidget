@@ -4,11 +4,129 @@ import { use, useEffect, useState, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Pusher from 'pusher-js';
 
+interface KickBadge {
+  type: string;
+  text?: string;
+  count?: number;
+  badge_image?: {
+    url?: string;
+  };
+}
+
 interface ChatMessage {
   id: string;
   sender: string;
   content: string;
   color?: string;
+  badges?: KickBadge[];
+}
+
+// Kick Resmi Rozet Render Motoru
+function RenderBadge({ badge }: { badge: KickBadge }) {
+  // 1. Kick CDN doğrudan rozet görseli gönderdiyse (Özel Abone Rozetleri)
+  if (badge.badge_image?.url) {
+    return (
+      <img
+        src={badge.badge_image.url}
+        alt={badge.type || 'badge'}
+        className="inline-block h-4 w-4 object-contain align-middle rounded-sm select-none"
+      />
+    );
+  }
+
+  // 2. Kick Global Rozet Tipleri (Resmi SVG/Rozet URL Yedekleri)
+  const badgeType = (badge.type || '').toLowerCase();
+
+  if (badgeType === 'broadcaster' || badgeType === 'streamer') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#53FC18] text-black leading-none uppercase tracking-wider shadow-sm">
+        YAYINCI
+      </span>
+    );
+  }
+
+  if (badgeType === 'moderator' || badgeType === 'mod') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#00e59b] text-black leading-none uppercase tracking-wider shadow-sm">
+        MOD
+      </span>
+    );
+  }
+
+  if (badgeType === 'subscriber' || badgeType === 'sub') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#53FC18]/20 border border-[#53FC18] text-[#53FC18] leading-none uppercase">
+        ★ {badge.count ? `${badge.count}M` : 'SUB'}
+      </span>
+    );
+  }
+
+  if (badgeType === 'vip') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#a970ff] text-black leading-none uppercase">
+        VIP
+      </span>
+    );
+  }
+
+  if (badgeType === 'verified') {
+    return (
+      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#53FC18] text-black text-[10px] font-black">
+        ✓
+      </span>
+    );
+  }
+
+  if (badgeType === 'founder') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-400 text-black leading-none uppercase">
+        1ST
+      </span>
+    );
+  }
+
+  if (badgeType === 'og') {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-cyan-400 text-black leading-none uppercase">
+        OG
+      </span>
+    );
+  }
+
+  return null;
+}
+
+// [emote:ID:NAME] Çözümleyici
+function renderChatWithEmotes(content: string) {
+  const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_]+)\]/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = emoteRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(content.substring(lastIndex, match.index));
+    }
+    const emoteId = match[1];
+    const emoteName = match[2];
+    parts.push(
+      <img
+        key={`${emoteId}-${match.index}`}
+        src={`https://files.kick.com/emotes/${emoteId}/fullsize`}
+        alt={emoteName}
+        title={emoteName}
+        className="inline-block h-6 w-auto align-middle mx-1 select-none"
+        loading="lazy"
+      />
+    );
+    lastIndex = emoteRegex.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(content.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : content;
 }
 
 function WidgetContent({ slug }: { slug: string }) {
@@ -26,7 +144,7 @@ function WidgetContent({ slug }: { slug: string }) {
   const [isLive, setIsLive] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Saat Güncelleyici
+  // Saat
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -44,7 +162,7 @@ function WidgetContent({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [format]);
 
-  // Kick Veri Çekici
+  // Kick Kanal Verisi
   const fetchKickChannelData = useCallback(async () => {
     if (!channel) return null;
     try {
@@ -68,12 +186,12 @@ function WidgetContent({ slug }: { slug: string }) {
       }
 
       return chatroomId;
-    } catch (err) {
+    } catch {
       return null;
     }
   }, [channel]);
 
-  // Kick WebSocket (İzleyici Sayacı ve Canlı Sohbet Katmanı)
+  // Kick Canlı WebSocket Dinleyicisi
   useEffect(() => {
     if ((slug !== 'kick-viewers' && slug !== 'kick-chat') || !channel) return;
 
@@ -108,13 +226,20 @@ function WidgetContent({ slug }: { slug: string }) {
         if (slug === 'kick-chat') {
           channelInstance.bind('App\\Events\\ChatMessageEvent', (chatData: any) => {
             if (chatData?.content) {
+              // Kick payload'unda rozetler sender.identity.badges veya sender.badges içinde gelebilir
+              const extractedBadges: KickBadge[] =
+                chatData.sender?.identity?.badges ||
+                chatData.sender?.badges ||
+                [];
+
               const newMsg: ChatMessage = {
-                id: chatData.id || String(Date.now()),
+                id: chatData.id || String(Date.now() + Math.random()),
                 sender: chatData.sender?.username || 'izleyici',
                 content: chatData.content,
                 color: chatData.sender?.identity?.color || '#53FC18',
+                badges: extractedBadges,
               };
-              setMessages((prev) => [...prev.slice(-10), newMsg]);
+              setMessages((prev) => [...prev.slice(-12), newMsg]);
             }
           });
         }
@@ -139,15 +264,30 @@ function WidgetContent({ slug }: { slug: string }) {
   return (
     <div className="bg-transparent min-h-screen flex items-start justify-start p-4 font-sans select-none overflow-hidden">
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-        {/* 1. IRL HUD */}
-        {slug === 'irl-hud' && (
-          <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-              <span className="text-xs font-black tracking-widest text-red-400">LIVE</span>
-            </div>
-            <div className="h-4 w-[1px] bg-white/20" />
-            <span className="text-sm font-semibold font-mono tracking-wide">{time}</span>
+        {/* 1. Kick Şeffaf Chat Box */}
+        {slug === 'kick-chat' && (
+          <div className="w-96 space-y-2.5">
+            {messages.length === 0 && (
+              <div className="text-xs text-neutral-400 font-mono italic bg-black/50 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10">
+                Canlı sohbet akışı bekleniyor...
+              </div>
+            )}
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                className="bg-black/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 text-white text-sm shadow-2xl animate-fadeIn transition-all"
+              >
+                <div className="flex items-center flex-wrap gap-1.5 mb-1 leading-none">
+                  {m.badges && m.badges.map((b, idx) => <RenderBadge key={idx} badge={b} />)}
+                  <span className="font-bold text-sm tracking-wide" style={{ color: m.color }}>
+                    {m.sender}:
+                  </span>
+                </div>
+                <div className="text-slate-100 text-sm font-normal leading-relaxed break-words">
+                  {renderChatWithEmotes(m.content)}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -162,7 +302,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 3. Goal Bar (Hedef Çubuğu) */}
+        {/* 3. Goal Bar */}
         {slug === 'goal-bar' && (
           <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
             <div className="flex justify-between text-xs font-bold font-mono">
@@ -175,20 +315,15 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 4. Kick Canlı Sohbet Katmanı (Chat Box) */}
-        {slug === 'kick-chat' && (
-          <div className="w-80 space-y-2">
-            {messages.length === 0 && (
-              <div className="text-xs text-neutral-500 font-mono italic bg-black/40 px-3 py-1.5 rounded-lg">
-                Mesajlar bekleniyor...
-              </div>
-            )}
-            {messages.map((m) => (
-              <div key={m.id} className="bg-black/80 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 text-white text-xs shadow-lg animate-fadeIn">
-                <span className="font-bold mr-1.5" style={{ color: m.color }}>{m.sender}:</span>
-                <span className="text-slate-200">{m.content}</span>
-              </div>
-            ))}
+        {/* 4. IRL HUD */}
+        {slug === 'irl-hud' && (
+          <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-xs font-black tracking-widest text-red-400">LIVE</span>
+            </div>
+            <div className="h-4 w-[1px] bg-white/20" />
+            <span className="text-sm font-semibold font-mono tracking-wide">{time}</span>
           </div>
         )}
 
