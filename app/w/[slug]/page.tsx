@@ -215,6 +215,7 @@ function WidgetContent({ slug }: { slug: string }) {
   const showLocation = searchParams.get('showLocation') !== 'false';
   const initialRawLocation = searchParams.get('location') || 'auto';
   const showWeather = searchParams.get('showWeather') !== 'false';
+  const showBattery = searchParams.get('showBattery') !== 'false';
 
   const defaultAccent = slug === 'sub-goal' ? '#A970FF' : '#53FC18';
   const defaultTitle = slug === 'sub-goal' ? 'ABONE HEDEFİ' : (slug === 'follower-goal' ? 'TAKİPÇİ HEDEFİ' : 'HEDEF');
@@ -237,11 +238,15 @@ function WidgetContent({ slug }: { slug: string }) {
   const [followerCount, setFollowerCount] = useState<number>(0);
   const [subCount, setSubCount] = useState<number>(initialCurrent);
   
-  // Dinamik Konum & Canlı Komut State'i
+  // Konum & Hava Durumu
   const [activeLocationQuery, setActiveLocationQuery] = useState<string>(initialRawLocation);
   const [cityName, setCityName] = useState<string>(initialRawLocation !== 'auto' && initialRawLocation ? initialRawLocation : 'Konum aranıyor...');
   const [temperature, setTemperature] = useState<string>('...');
   const [weatherCode, setWeatherCode] = useState<number>(0);
+
+  // Pil Durumu (Sadece gerçek veri varsa number olur, yoksa null kalıp gizlenir)
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
+  const [isCharging, setIsCharging] = useState<boolean>(false);
 
   // 1. Saat
   useEffect(() => {
@@ -261,7 +266,36 @@ function WidgetContent({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [format]);
 
-  // 2. Konum ve Hava Durumu Çözümleyici
+  // 2. Gerçek Cihaz Batarya Sensörü
+  useEffect(() => {
+    if (slug !== 'irl-hud' || !showBattery) return;
+
+    let batteryInstance: any = null;
+
+    if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+      (navigator as any).getBattery().then((bat: any) => {
+        batteryInstance = bat;
+        setBatteryLevel(Math.round(bat.level * 100));
+        setIsCharging(bat.charging);
+
+        bat.addEventListener('levelchange', () => setBatteryLevel(Math.round(bat.level * 100)));
+        bat.addEventListener('chargingchange', () => setIsCharging(bat.charging));
+      }).catch(() => {
+        setBatteryLevel(null);
+      });
+    } else {
+      setBatteryLevel(null);
+    }
+
+    return () => {
+      if (batteryInstance) {
+        batteryInstance.removeEventListener('levelchange', () => {});
+        batteryInstance.removeEventListener('chargingchange', () => {});
+      }
+    };
+  }, [slug, showBattery]);
+
+  // 3. Konum ve Hava Durumu Çözümleyici
   const resolveLocationAndWeather = useCallback(async (locQuery: string) => {
     let lat: number | null = null;
     let lon: number | null = null;
@@ -305,7 +339,7 @@ function WidgetContent({ slug }: { slug: string }) {
     } catch (err) {
       console.error('Weather error:', err);
       if (!detectedName) setCityName('Canlı Konum');
-      setTemperature('24°C');
+      setTemperature('25°C');
     }
   }, []);
 
@@ -316,7 +350,7 @@ function WidgetContent({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [slug, activeLocationQuery, resolveLocationAndWeather]);
 
-  // 3. Kick Kanal Verileri
+  // 4. Kick Kanal Verileri
   const fetchChannelData = useCallback(async () => {
     if (!channel) return null;
     const cleanChannel = channel.toLowerCase().trim();
@@ -365,7 +399,7 @@ function WidgetContent({ slug }: { slug: string }) {
     }
   }, [channel, currentParam]);
 
-  // 4. Pusher WebSocket (Canlı Chat Komutları & Takip/Abone)
+  // 5. Pusher WebSocket (!konum komutu)
   useEffect(() => {
     if (!channel) return;
 
@@ -383,7 +417,7 @@ function WidgetContent({ slug }: { slug: string }) {
 
         chatroomInstance = pusher.subscribe(`chatrooms.${res.chatroomId}.v2`);
 
-        // Chat Dinleyicisi & Canlı Mod Komutu (!konum ŞehirAdı)
+        // Canlı Chat Dinleyicisi
         chatroomInstance.bind('App\\Events\\ChatMessageEvent', (chatData: any) => {
           if (chatData?.content) {
             const rawContent = (chatData.content || '').trim();
@@ -392,7 +426,6 @@ function WidgetContent({ slug }: { slug: string }) {
               chatData.sender?.badges ||
               [];
 
-            // Yayıncı veya Moderatör Yetki Kontrolü
             const isAuthorized = extractedBadges.some(
               (b) => {
                 const t = (b.type || '').toLowerCase();
@@ -400,7 +433,7 @@ function WidgetContent({ slug }: { slug: string }) {
               }
             );
 
-            // !konum veya !location komutu
+            // !konum Komutu
             if (isAuthorized && (rawContent.startsWith('!konum ') || rawContent.startsWith('!location '))) {
               const newLoc = rawContent.replace(/^!(konum|location)\s+/i, '').trim();
               if (newLoc) {
@@ -474,6 +507,14 @@ function WidgetContent({ slug }: { slug: string }) {
 
   const currentGoalValue = slug === 'sub-goal' ? subCount : followerCount;
   const percentage = Math.min(100, Math.max(0, (currentGoalValue / target) * 100));
+
+  const getBatteryColor = () => {
+    if (isCharging) return '#53FC18';
+    if (batteryLevel === null) return '#53FC18';
+    if (batteryLevel <= 20) return '#ef4444';
+    if (batteryLevel <= 45) return '#f59e0b';
+    return '#53FC18';
+  };
 
   return (
     <div className="bg-transparent min-h-screen p-4 font-sans select-none overflow-hidden block">
@@ -575,7 +616,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 5. Modüler IRL HUD */}
+        {/* 5. Modüler IRL CANLI YAYIN HUD */}
         {slug === 'irl-hud' && (
           <div className="inline-flex items-center gap-3.5 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl text-xs font-semibold">
             {showLive && (
@@ -608,6 +649,16 @@ function WidgetContent({ slug }: { slug: string }) {
                 <span className="flex items-center gap-1.5 text-amber-300 font-mono font-bold">
                   <span>{getWeatherIcon(weatherCode)}</span>
                   <span>{temperature}</span>
+                </span>
+              </>
+            )}
+
+            {showBattery && batteryLevel !== null && (
+              <>
+                {(showLive || showClock || showLocation || showWeather) && <div className="h-4 w-[1px] bg-white/20" />}
+                <span className="flex items-center gap-1 font-mono font-bold" style={{ color: getBatteryColor() }}>
+                  <span>{isCharging ? '⚡🔋' : '🔋'}</span>
+                  <span>{batteryLevel}%</span>
                 </span>
               </>
             )}
