@@ -131,7 +131,9 @@ function KickOfficialBadge({
 }
 
 function WidgetContent({ slug }: { slug: string }) {
-  const [streamEvents, setStreamEvents] = useState<KickStreamEvent[]>([]);
+  const [streamEvents, setStreamEvents] = useState<KickStreamEvent[]>([
+    { id: '1', type: 'follower', username: 'Hazır (Canlı Bekleniyor)', detail: 'Takipçi', time: 'Şimdi' }
+  ]);
   
   const searchParams = useSearchParams();
   const channel = searchParams.get('channel') || 'itsfatih';
