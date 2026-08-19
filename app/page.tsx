@@ -23,6 +23,26 @@ export default function HomePage() {
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.tr;
 
+  // Widget ID'sine göre doğrudan çevrilmiş başlık ve açıklama fonksiyonu
+  const getWidgetInfo = (id: string) => {
+    switch (id) {
+      case "kick-viewers":
+        return { name: t.w_viewers_name, desc: t.w_viewers_desc };
+      case "kick-chat":
+        return { name: t.w_chat_name, desc: t.w_chat_desc };
+      case "follower-goal":
+        return { name: t.w_fgoal_name, desc: t.w_fgoal_desc };
+      case "sub-goal":
+        return { name: t.w_sgoal_name, desc: t.w_sgoal_desc };
+      case "irl-hud":
+        return { name: t.w_irl_name, desc: t.w_irl_desc };
+      case "clock":
+        return { name: t.w_clock_name, desc: t.w_clock_desc };
+      default:
+        return { name: id, desc: "" };
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#090b10] text-slate-100 font-sans relative pb-20">
       {/* Üst Bar */}
@@ -54,36 +74,39 @@ export default function HomePage() {
 
         {/* Widget Kartları Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {WIDGETS_LIST.map((w) => (
-            <div
-              key={w.id}
-              className="glass-card rounded-2xl p-6 border border-white/5 hover:border-emerald-500/30 transition-all flex flex-col justify-between group shadow-xl hover:-translate-y-1 duration-300"
-            >
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-emerald-400">
-                    {w.category}
-                  </span>
+          {WIDGETS_LIST.map((w) => {
+            const info = getWidgetInfo(w.id);
+            return (
+              <div
+                key={w.id}
+                className="glass-card rounded-2xl p-6 border border-white/5 hover:border-emerald-500/30 transition-all flex flex-col justify-between group shadow-xl hover:-translate-y-1 duration-300"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-emerald-400">
+                      {w.category}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition">
+                    {info.name}
+                  </h3>
+                  <p className="text-slate-400 text-xs mt-2 leading-relaxed">
+                    {info.desc}
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition">
-                  {w.name}
-                </h3>
-                <p className="text-slate-400 text-xs mt-2 leading-relaxed">
-                  {w.description}
-                </p>
-              </div>
 
-              <div className="mt-6 pt-4 border-t border-white/5 flex justify-end">
-                <Link
-                  href={`/builder/${w.id}`}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-emerald-500 hover:text-black text-white text-xs font-bold transition-all"
-                >
-                  <span>{t.customize}</span>
-                  <span>&rarr;</span>
-                </Link>
+                <div className="mt-6 pt-4 border-t border-white/5 flex justify-end">
+                  <Link
+                    href={`/builder/${w.id}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-emerald-500 hover:text-black text-white text-xs font-bold transition-all"
+                  >
+                    <span>{t.customize}</span>
+                    <span>&rarr;</span>
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </main>
     </div>
