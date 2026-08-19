@@ -1,91 +1,75 @@
-"use client";
+import Link from 'next/link';
 
-import { useState, useEffect } from "react";
-import { WIDGETS_LIST } from "@/lib/widgets";
-import { TRANSLATIONS, LangCode } from "@/lib/i18n";
-import LanguageSelector from "@/components/LanguageSelector";
-import Link from "next/link";
-
-export default function HomePage() {
-  const [lang, setLang] = useState<LangCode>("tr");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("app_lang") as LangCode;
-    if (saved && TRANSLATIONS[saved]) {
-      setLang(saved);
-    }
-  }, []);
-
-  const handleLangChange = (newLang: LangCode) => {
-    setLang(newLang);
-    localStorage.setItem("app_lang", newLang);
-  };
-
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.tr;
+export default function Home() {
+  const widgets = [
+    {
+      id: 'irl-hud',
+      title: 'IRL Stream HUD',
+      desc: 'Hava durumu, şarj, anlık konum, hız ve izleyici sayacı.',
+      badge: 'Popüler',
+      href: '/builder/irl-hud',
+      color: 'from-emerald-500/20 to-lime-500/10 border-lime-500/30 text-lime-400',
+    },
+    {
+      id: 'sub-goal',
+      title: 'Sub & Follow Goal',
+      desc: 'Canlı abonelik ve takipçi hedef çubuğu animasyonları.',
+      badge: 'Canlı',
+      href: '/builder/sub-goal',
+      color: 'from-blue-500/20 to-cyan-500/10 border-cyan-500/30 text-cyan-400',
+    },
+    {
+      id: 'events',
+      title: 'Son Olaylar (Stream Labels)',
+      desc: 'Son takipçi, abone, host ve hediye sub rozetleri (1-3-5 limitli).',
+      badge: 'Yeni',
+      href: '/builder/events',
+      color: 'from-purple-500/20 to-pink-500/10 border-purple-500/30 text-purple-400',
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#090b10] text-slate-100 font-sans relative pb-20">
-      {/* Üst Bar */}
-      <header className="border-b border-white/5 bg-[#090b10]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_12px_#53FC18]" />
-            <span className="font-extrabold text-sm tracking-widest uppercase font-mono text-white">
-              STREAMWIDGET
-            </span>
+    <main className="min-h-screen bg-slate-950 text-white p-6 md:p-12 font-sans flex flex-col justify-between">
+      <div className="max-w-5xl mx-auto w-full space-y-12">
+        <header className="space-y-4 text-center md:text-left">
+          <div className="inline-block bg-[#53FC18]/10 border border-[#53FC18]/30 px-3 py-1 rounded-full text-[#53FC18] text-xs font-bold uppercase tracking-wider">
+            Kick Canlı Yayın Araçları
           </div>
-
-          <div className="flex items-center gap-4">
-            <LanguageSelector currentLang={lang} onSelectLang={handleLangChange} />
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Bölümü */}
-      <main className="max-w-6xl mx-auto px-6 mt-12">
-        <div className="text-center max-w-2xl mx-auto mb-14 space-y-3">
-          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-            {t.heroTitle}
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
+            StreamWidget<span className="text-[#53FC18]">.live</span>
           </h1>
-          <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
-            {t.heroSubtitle}
+          <p className="text-white/60 text-base md:text-lg max-w-2xl">
+            Kick yayıncıları için yüksek performanslı, modern ve tamamen ücretsiz OBS yayın widgetları.
           </p>
-        </div>
+        </header>
 
-        {/* Widget Kartları Grid (Kategori rozetleri kaldırıldı) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {WIDGETS_LIST.map((w) => {
-            const widgetName = w.name[lang] || w.name.en || w.name.tr;
-            const widgetDesc = w.description[lang] || w.description.en || w.description.tr;
-
-            return (
-              <div
-                key={w.id}
-                className="glass-card rounded-2xl p-7 border border-white/5 hover:border-emerald-500/30 transition-all flex flex-col justify-between group shadow-xl hover:-translate-y-1 duration-300"
-              >
-                <div>
-                  <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition">
-                    {widgetName}
-                  </h3>
-                  <p className="text-slate-400 text-xs mt-2.5 leading-relaxed">
-                    {widgetDesc}
-                  </p>
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {widgets.map((w) => (
+            <Link
+              key={w.id}
+              href={w.href}
+              className={`p-6 rounded-2xl border bg-gradient-to-b ${w.color} backdrop-blur-md transition-all hover:scale-[1.02] hover:border-white/40 flex flex-col justify-between space-y-4`}
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase px-2.5 py-1 rounded-md bg-white/10 text-white">
+                    {w.badge}
+                  </span>
                 </div>
-
-                <div className="mt-8 pt-4 border-t border-white/5 flex justify-end">
-                  <Link
-                    href={`/builder/${w.id}`}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-emerald-500 hover:text-black text-white text-xs font-bold transition-all"
-                  >
-                    <span>{t.customize}</span>
-                    <span>&rarr;</span>
-                  </Link>
-                </div>
+                <h2 className="text-xl font-bold text-white">{w.title}</h2>
+                <p className="text-xs text-white/70 leading-relaxed">{w.desc}</p>
               </div>
-            );
-          })}
-        </div>
-      </main>
-    </div>
+              <div className="text-xs font-bold flex items-center gap-1.5 pt-2">
+                Oluşturucuya Git <span>→</span>
+              </div>
+            </Link>
+          ))}
+        </section>
+      </div>
+
+      <footer className="text-center text-white/40 text-xs py-6 border-t border-white/10 mt-12">
+        StreamWidget.live &copy; {new Date().getFullYear()} — Tüm Hakları Saklıdır.
+      </footer>
+    </main>
   );
 }
