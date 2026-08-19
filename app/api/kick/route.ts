@@ -11,22 +11,33 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(`https://kick.com/api/v2/channels/${channel.toLowerCase()}`, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Accept': 'application/json',
       },
-      next: { revalidate: 3 }, // 3 saniyede bir tazele
+      next: { revalidate: 10 },
     });
 
     if (!res.ok) {
-      return NextResponse.json({ viewers: 0, isLive: false }, { status: 200 });
+      // v1 fallback
+      const fallbackRes = await fetch(`https://kick.com/api/v1/channels/${channel.toLowerCase()}`);
+      if (fallbackRes.ok) {
+        const fbData = await fallbackRes.json();
+        return NextResponse.json({
+          chatroomId: fbData?.chatroom?.id,
+          livestream: fbData?.livestream,
+          subscriberBadges: fbData?.subscriber_badges || [],
+        });
+      }
+      return NextResponse.json({ chatroomId: null, subscriberBadges: [] });
     }
 
     const data = await res.json();
-    const isLive = data?.livestream !== null;
-    const viewers = data?.livestream?.viewer_count || 0;
-
-    return NextResponse.json({ viewers, isLive });
-  } catch (error) {
-    return NextResponse.json({ viewers: 0, isLive: false }, { status: 200 });
+    return NextResponse.json({
+      chatroomId: data?.chatroom?.id,
+      livestream: data?.livestream,
+      subscriberBadges: data?.subscriber_badges || [],
+    });
+  } catch {
+    return NextResponse.json({ chatroomId: null, subscriberBadges: [] });
   }
 }
