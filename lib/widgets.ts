@@ -1,8 +1,8 @@
 export interface WidgetField {
   name: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'color';
-  defaultValue?: string | number;
+  type: 'text' | 'number' | 'select' | 'color' | 'checkbox';
+  defaultValue?: string | number | boolean;
   placeholder?: string;
   options?: { label: string; value: string }[];
 }
@@ -22,7 +22,7 @@ export const WIDGETS_LIST: WidgetDef[] = [
     category: 'Kick',
     description: 'Kick kanalınızın anlık izleyici sayısını gösteren şeffaf neon rozet.',
     fields: [
-      { name: 'channel', label: 'Kick Kanal Adı', type: 'text', defaultValue: 'itsfatih', placeholder: 'Kanal adı (örn: itsfatih)' },
+      { name: 'channel', label: 'Kick Kanal Adı', type: 'text', defaultValue: 'itsfatih', placeholder: 'Kanal adı' },
       { name: 'accent', label: 'Vurgu Rengi', type: 'color', defaultValue: '#53FC18' },
       { name: 'scale', label: 'Boyut (%)', type: 'select', defaultValue: '100', options: [{ label: 'Küçük (%80)', value: '80' }, { label: 'Normal (%100)', value: '100' }, { label: 'Büyük (%125)', value: '125' }, { label: 'Dev (%150)', value: '150' }] },
     ],
@@ -68,9 +68,14 @@ export const WIDGETS_LIST: WidgetDef[] = [
     id: 'irl-hud',
     name: 'IRL Canlı Yayın HUD',
     category: 'IRL',
-    description: 'Dış mekan yayınları için dinamik saat ve canlı LIVE durum rozeti.',
+    description: 'Dış mekan yayınları için modüler LIVE rozeti, dijital saat, konum ve anlık hava durumu.',
     fields: [
+      { name: 'showLive', label: 'LIVE Rozeti Gösterilsin mi?', type: 'select', defaultValue: 'true', options: [{ label: 'Evet (Göster)', value: 'true' }, { label: 'Hayır (Gizle)', value: 'false' }] },
+      { name: 'showClock', label: 'Saat Gösterilsin mi?', type: 'select', defaultValue: 'true', options: [{ label: 'Evet (Göster)', value: 'true' }, { label: 'Hayır (Gizle)', value: 'false' }] },
       { name: 'format', label: 'Saat Formatı', type: 'select', defaultValue: '24', options: [{ label: '24 Saat (19:30)', value: '24' }, { label: '12 Saat (07:30 PM)', value: '12' }] },
+      { name: 'showLocation', label: 'Konum Gösterilsin mi?', type: 'select', defaultValue: 'true', options: [{ label: 'Evet (Göster)', value: 'true' }, { label: 'Hayır (Gizle)', value: 'false' }] },
+      { name: 'location', label: 'Şehir / Konum', type: 'text', defaultValue: 'Frankfurt', placeholder: 'Örn: Frankfurt, Istanbul' },
+      { name: 'showWeather', label: 'Hava Durumu Gösterilsin mi?', type: 'select', defaultValue: 'true', options: [{ label: 'Evet (Göster)', value: 'true' }, { label: 'Hayır (Gizle)', value: 'false' }] },
       { name: 'scale', label: 'Boyut (%)', type: 'select', defaultValue: '100', options: [{ label: 'Normal (%100)', value: '100' }, { label: 'Büyük (%125)', value: '125' }] },
     ],
   },
