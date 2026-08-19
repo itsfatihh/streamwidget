@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "StreamWidget Live",
-  description: "Yayıncılar için canlı widget katmanı",
+  title: "StreamWidget - Modern Canlı Yayın Widget Kütüphanesi",
+  description: "OBS ve Streamlabs için ücretsiz, şeffaf ve özelleştirilebilir overlay katmanları.",
 };
 
 export default function RootLayout({
@@ -12,8 +12,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
-      <body className="bg-transparent antialiased">{children}</body>
+    <html lang="tr" className="dark">
+      <body className="bg-[#090b10] text-slate-100 min-h-screen antialiased">
+        {children}
+      </body>
     </html>
   );
 }
