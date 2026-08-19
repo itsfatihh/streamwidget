@@ -7,7 +7,7 @@ export default function WidgetPage() {
   const [time, setTime] = useState("");
   const [city, setCity] = useState("Yükleniyor...");
   const [country, setCountry] = useState("");
-  const [batteryLevel, setBatteryLevel] = useState(null);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -27,7 +27,7 @@ export default function WidgetPage() {
 
   useEffect(() => {
     if (typeof navigator !== "undefined" && "getBattery" in navigator) {
-      navigator.getBattery().then((battery) => {
+      (navigator as any).getBattery().then((battery: any) => {
         setBatteryLevel(Math.round(battery.level * 100));
         battery.addEventListener("levelchange", () => {
           setBatteryLevel(Math.round(battery.level * 100));
@@ -44,7 +44,7 @@ export default function WidgetPage() {
         if (data.country_name) setCountry(data.country_name);
       })
       .catch(() => {
-        setCity("Canlı Yayın");
+        setCity("Canlı");
         setCountry("IRL");
       });
   }, []);
