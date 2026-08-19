@@ -1,79 +1,88 @@
-import Link from "next/link";
+"use client";
+
+import { useState, useEffect } from "react";
 import { WIDGETS_LIST } from "@/lib/widgets";
+import { TRANSLATIONS, LangCode } from "@/lib/i18n";
+import LanguageSelector from "@/components/LanguageSelector";
+import Link from "next/link";
 
 export default function HomePage() {
-  return (
-    <div className="min-h-screen bg-[#090b10] text-slate-100 relative overflow-hidden bg-grid-pattern">
-      {/* Arka Plan Neon Işıkları */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-emerald-500/10 blur-[130px] rounded-full pointer-events-none" />
-      <div className="absolute top-1/3 right-[-100px] w-[500px] h-[300px] bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none" />
+  const [lang, setLang] = useState<LangCode>("tr");
 
-      {/* Navbar */}
-      <header className="border-b border-white/5 backdrop-blur-md sticky top-0 z-50 bg-[#090b10]/80">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+  useEffect(() => {
+    const saved = localStorage.getItem("app_lang") as LangCode;
+    if (saved && TRANSLATIONS[saved]) {
+      setLang(saved);
+    }
+  }, []);
+
+  const handleLangChange = (newLang: LangCode) => {
+    setLang(newLang);
+    localStorage.setItem("app_lang", newLang);
+  };
+
+  const t = TRANSLATIONS[lang] || TRANSLATIONS.tr;
+
+  return (
+    <div className="min-h-screen bg-[#090b10] text-slate-100 font-sans relative pb-20">
+      {/* Üst Bar */}
+      <header className="border-b border-white/5 bg-[#090b10]/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-black text-black text-sm shadow-lg shadow-emerald-500/20">
-              SW
-            </div>
-            <span className="font-bold tracking-tight text-lg text-white">Stream<span className="text-emerald-400">Widget</span></span>
-          </div>
-          <div className="flex items-center gap-4 text-xs font-medium">
-            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" /> OBS & Streamlabs Uyumlu
+            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_12px_#53FC18]" />
+            <span className="font-extrabold text-sm tracking-widest uppercase font-mono text-white">
+              STREAMWIDGET
             </span>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <LanguageSelector currentLang={lang} onSelectLang={handleLangChange} />
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <main className="max-w-7xl mx-auto px-6 py-16">
-        <div className="text-center max-w-3xl mx-auto mb-20">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-slate-300 mb-6 backdrop-blur-sm">
-            ✨ Tamamen Ücretsiz • Giriş Yapmak Gerekmez
-          </div>
-          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
-            Yayınların İçin <br />
-            <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-              Yeni Nesil Widget’lar
-            </span>
+      {/* Hero Bölümü */}
+      <main className="max-w-6xl mx-auto px-6 mt-12">
+        <div className="text-center max-w-2xl mx-auto mb-14 space-y-3">
+          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+            {t.heroTitle}
           </h1>
-          <p className="mt-5 text-slate-400 text-base sm:text-lg leading-relaxed">
-            OBS, Streamlabs ve Kick yayınların için ultra hafif, özelleştirilebilir ve şeffaf katmanlar. Tek tıkla yapılandır ve yayına ekle.
+          <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+            {t.heroSubtitle}
           </p>
         </div>
 
-        {/* Widget Grid */}
+        {/* Widget Kartları Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {WIDGETS_LIST.map((w) => (
-            <Link
+            <div
               key={w.id}
-              href={"/builder/" + w.id}
-              className="glass-card glass-card-hover rounded-2xl p-6 flex flex-col justify-between group relative overflow-hidden"
+              className="glass-card rounded-2xl p-6 border border-white/5 hover:border-emerald-500/30 transition-all flex flex-col justify-between group shadow-xl hover:-translate-y-1 duration-300"
             >
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-[11px] font-mono font-semibold uppercase px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-emerald-400">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-emerald-400">
                     {w.category}
                   </span>
-                  <span className="text-xs font-semibold text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                    Oluştur &rarr;
-                  </span>
                 </div>
-                <h3 className="text-xl font-bold text-white group-hover:text-emerald-300 transition-colors mb-2">
+                <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition">
                   {w.name}
                 </h3>
-                <p className="text-slate-400 text-sm leading-relaxed">
+                <p className="text-slate-400 text-xs mt-2 leading-relaxed">
                   {w.description}
                 </p>
               </div>
 
-              <div className="mt-8 pt-4 border-t border-white/5 flex items-center justify-between text-xs text-slate-500 font-mono">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Aktif Modül
-                </span>
-                <span>OBS Browser</span>
+              <div className="mt-6 pt-4 border-t border-white/5 flex justify-end">
+                <Link
+                  href={`/builder/${w.id}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-emerald-500 hover:text-black text-white text-xs font-bold transition-all"
+                >
+                  <span>{t.customize}</span>
+                  <span>&rarr;</span>
+                </Link>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       </main>
