@@ -35,7 +35,6 @@ function KickOfficialBadge({ badge }: { badge: KickBadge }) {
 
   const type = (badge.type || '').toLowerCase();
 
-  // Yayıncı (Broadcaster) Rozeti
   if (type === 'broadcaster' || type === 'streamer') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1.5 rounded-[4px] bg-[#53FC18] text-black font-extrabold text-[10px] uppercase mr-1.5 align-middle select-none shrink-0">
@@ -44,7 +43,6 @@ function KickOfficialBadge({ badge }: { badge: KickBadge }) {
     );
   }
 
-  // Moderatör Rozeti (Kılıç İkonu)
   if (type === 'moderator' || type === 'mod') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-[4px] bg-[#00E701] text-black mr-1.5 align-middle select-none shrink-0" title="Moderatör">
@@ -55,7 +53,6 @@ function KickOfficialBadge({ badge }: { badge: KickBadge }) {
     );
   }
 
-  // Abone Rozeti (Kick Yeşil Yıldız)
   if (type === 'subscriber' || type === 'sub') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-[4px] bg-[#53FC18]/15 border border-[#53FC18] text-[#53FC18] font-bold text-[10px] mr-1.5 align-middle select-none shrink-0" title={`Abone (${badge.count || 1} Ay)`}>
@@ -64,7 +61,6 @@ function KickOfficialBadge({ badge }: { badge: KickBadge }) {
     );
   }
 
-  // VIP Rozeti (Taç İkonu)
   if (type === 'vip') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1.5 rounded-[4px] bg-[#A970FF] text-white font-extrabold text-[10px] uppercase mr-1.5 align-middle select-none shrink-0">
@@ -73,7 +69,6 @@ function KickOfficialBadge({ badge }: { badge: KickBadge }) {
     );
   }
 
-  // Doğrulanmış Rozet (Tik)
   if (type === 'verified') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-full bg-[#53FC18] text-black font-black text-[11px] mr-1.5 align-middle select-none shrink-0">
@@ -82,7 +77,6 @@ function KickOfficialBadge({ badge }: { badge: KickBadge }) {
     );
   }
 
-  // Kurucu (Founder) Rozeti
   if (type === 'founder') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[4px] bg-[#FFB800] text-black font-black text-[10px] mr-1.5 align-middle select-none shrink-0">
@@ -91,7 +85,6 @@ function KickOfficialBadge({ badge }: { badge: KickBadge }) {
     );
   }
 
-  // OG Rozeti
   if (type === 'og') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[4px] bg-[#00D2FF] text-black font-bold text-[10px] mr-1.5 align-middle select-none shrink-0">
@@ -103,16 +96,16 @@ function KickOfficialBadge({ badge }: { badge: KickBadge }) {
   return null;
 }
 
-// Emote Ayrıştırıcı (Kick Resmi Boyut ve Hizalama)
+// Emote Ayrıştırıcı
 function parseKickEmotes(content: string) {
   const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_]+)\]/g;
   const nodes = [];
-  let lastIdx = 0;
+  let lastIndex = 0;
   let match;
 
   while ((match = emoteRegex.exec(content)) !== null) {
-    if (match.index > lastIdx) {
-      nodes.push(content.substring(lastIdx, match.index));
+    if (match.index > lastIndex) {
+      nodes.push(content.substring(lastIndex, match.index));
     }
     const emoteId = match[1];
     const emoteName = match[2];
@@ -126,11 +119,11 @@ function parseKickEmotes(content: string) {
         loading="lazy"
       />
     );
-    lastIdx = emoteRegex.lastIdx;
+    lastIndex = emoteRegex.lastIndex;
   }
 
-  if (lastIdx < content.length) {
-    nodes.push(content.substring(lastIdx));
+  if (lastIndex < content.length) {
+    nodes.push(content.substring(lastIndex));
   }
 
   return nodes.length > 0 ? nodes : content;
@@ -270,7 +263,7 @@ function WidgetContent({ slug }: { slug: string }) {
   return (
     <div className="bg-transparent min-h-screen flex items-start justify-start p-4 font-sans select-none overflow-hidden">
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-        {/* 1. KICK RESMİ SOHBET KATMANI (INLINE STREAM CHAT) */}
+        {/* 1. KICK RESMİ SOHBET KATMANI */}
         {slug === 'kick-chat' && (
           <div className="w-[420px] space-y-2">
             {messages.length === 0 && (
@@ -284,12 +277,10 @@ function WidgetContent({ slug }: { slug: string }) {
                 className="bg-[#0b0e14]/85 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/5 text-sm leading-[22px] shadow-lg animate-fadeIn text-slate-100"
                 style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
               >
-                {/* Rozetler */}
                 {m.badges && m.badges.map((b, idx) => (
                   <KickOfficialBadge key={idx} badge={b} />
                 ))}
 
-                {/* Kullanıcı Adı */}
                 <span
                   className="font-bold mr-2 text-[13px] tracking-wide align-middle"
                   style={{ color: m.color || '#53FC18' }}
@@ -297,7 +288,6 @@ function WidgetContent({ slug }: { slug: string }) {
                   {m.sender}:
                 </span>
 
-                {/* Mesaj İçeriği ve Satır İçi Emotelar */}
                 <span className="text-[13px] text-white font-normal align-middle break-words">
                   {parseKickEmotes(m.content)}
                 </span>
