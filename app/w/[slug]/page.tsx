@@ -21,73 +21,80 @@ interface ChatMessage {
   badges?: KickBadge[];
 }
 
-// Kick Resmi Rozet Render Motoru
-function RenderBadge({ badge }: { badge: KickBadge }) {
-  // 1. Kick CDN doğrudan rozet görseli gönderdiyse (Özel Abone Rozetleri)
+// Kick Resmi Rozet Vektörleri
+function KickOfficialBadge({ badge }: { badge: KickBadge }) {
   if (badge.badge_image?.url) {
     return (
       <img
         src={badge.badge_image.url}
         alt={badge.type || 'badge'}
-        className="inline-block h-4 w-4 object-contain align-middle rounded-sm select-none"
+        className="inline-block h-[18px] w-[18px] mr-1.5 align-middle select-none shrink-0"
       />
     );
   }
 
-  // 2. Kick Global Rozet Tipleri (Resmi SVG/Rozet URL Yedekleri)
-  const badgeType = (badge.type || '').toLowerCase();
+  const type = (badge.type || '').toLowerCase();
 
-  if (badgeType === 'broadcaster' || badgeType === 'streamer') {
+  // Yayıncı (Broadcaster) Rozeti
+  if (type === 'broadcaster' || type === 'streamer') {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#53FC18] text-black leading-none uppercase tracking-wider shadow-sm">
+      <span className="inline-flex items-center justify-center h-[18px] px-1.5 rounded-[4px] bg-[#53FC18] text-black font-extrabold text-[10px] uppercase mr-1.5 align-middle select-none shrink-0">
         YAYINCI
       </span>
     );
   }
 
-  if (badgeType === 'moderator' || badgeType === 'mod') {
+  // Moderatör Rozeti (Kılıç İkonu)
+  if (type === 'moderator' || type === 'mod') {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#00e59b] text-black leading-none uppercase tracking-wider shadow-sm">
-        MOD
+      <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-[4px] bg-[#00E701] text-black mr-1.5 align-middle select-none shrink-0" title="Moderatör">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+          <path d="M19.707 9.293l-5-5a1 1 0 0 0-1.414 1.414L14.586 7H7a5 5 0 0 0-5 5v5a1 1 0 0 0 2 0v-5a3 3 0 0 1 3-3h7.586l-1.293 1.293a1 1 0 0 0 1.414 1.414l5-5a1 1 0 0 0 0-1.414z" />
+        </svg>
       </span>
     );
   }
 
-  if (badgeType === 'subscriber' || badgeType === 'sub') {
+  // Abone Rozeti (Kick Yeşil Yıldız)
+  if (type === 'subscriber' || type === 'sub') {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#53FC18]/20 border border-[#53FC18] text-[#53FC18] leading-none uppercase">
-        ★ {badge.count ? `${badge.count}M` : 'SUB'}
+      <span className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-[4px] bg-[#53FC18]/15 border border-[#53FC18] text-[#53FC18] font-bold text-[10px] mr-1.5 align-middle select-none shrink-0" title={`Abone (${badge.count || 1} Ay)`}>
+        ★{badge.count ? badge.count : ''}
       </span>
     );
   }
 
-  if (badgeType === 'vip') {
+  // VIP Rozeti (Taç İkonu)
+  if (type === 'vip') {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-[#a970ff] text-black leading-none uppercase">
+      <span className="inline-flex items-center justify-center h-[18px] px-1.5 rounded-[4px] bg-[#A970FF] text-white font-extrabold text-[10px] uppercase mr-1.5 align-middle select-none shrink-0">
         VIP
       </span>
     );
   }
 
-  if (badgeType === 'verified') {
+  // Doğrulanmış Rozet (Tik)
+  if (type === 'verified') {
     return (
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#53FC18] text-black text-[10px] font-black">
+      <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-full bg-[#53FC18] text-black font-black text-[11px] mr-1.5 align-middle select-none shrink-0">
         ✓
       </span>
     );
   }
 
-  if (badgeType === 'founder') {
+  // Kurucu (Founder) Rozeti
+  if (type === 'founder') {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-400 text-black leading-none uppercase">
+      <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[4px] bg-[#FFB800] text-black font-black text-[10px] mr-1.5 align-middle select-none shrink-0">
         1ST
       </span>
     );
   }
 
-  if (badgeType === 'og') {
+  // OG Rozeti
+  if (type === 'og') {
     return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-cyan-400 text-black leading-none uppercase">
+      <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[4px] bg-[#00D2FF] text-black font-bold text-[10px] mr-1.5 align-middle select-none shrink-0">
         OG
       </span>
     );
@@ -96,37 +103,37 @@ function RenderBadge({ badge }: { badge: KickBadge }) {
   return null;
 }
 
-// [emote:ID:NAME] Çözümleyici
-function renderChatWithEmotes(content: string) {
+// Emote Ayrıştırıcı (Kick Resmi Boyut ve Hizalama)
+function parseKickEmotes(content: string) {
   const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_]+)\]/g;
-  const parts = [];
-  let lastIndex = 0;
+  const nodes = [];
+  let lastIdx = 0;
   let match;
 
   while ((match = emoteRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(content.substring(lastIndex, match.index));
+    if (match.index > lastIdx) {
+      nodes.push(content.substring(lastIdx, match.index));
     }
     const emoteId = match[1];
     const emoteName = match[2];
-    parts.push(
+    nodes.push(
       <img
         key={`${emoteId}-${match.index}`}
         src={`https://files.kick.com/emotes/${emoteId}/fullsize`}
         alt={emoteName}
         title={emoteName}
-        className="inline-block h-6 w-auto align-middle mx-1 select-none"
+        className="inline-block h-[24px] w-auto align-middle mx-1 my-[-4px] select-none"
         loading="lazy"
       />
     );
-    lastIndex = emoteRegex.lastIndex;
+    lastIdx = emoteRegex.lastIdx;
   }
 
-  if (lastIndex < content.length) {
-    parts.push(content.substring(lastIndex));
+  if (lastIdx < content.length) {
+    nodes.push(content.substring(lastIdx));
   }
 
-  return parts.length > 0 ? parts : content;
+  return nodes.length > 0 ? nodes : content;
 }
 
 function WidgetContent({ slug }: { slug: string }) {
@@ -191,7 +198,7 @@ function WidgetContent({ slug }: { slug: string }) {
     }
   }, [channel]);
 
-  // Kick Canlı WebSocket Dinleyicisi
+  // Kick Pusher WebSocket
   useEffect(() => {
     if ((slug !== 'kick-viewers' && slug !== 'kick-chat') || !channel) return;
 
@@ -226,7 +233,6 @@ function WidgetContent({ slug }: { slug: string }) {
         if (slug === 'kick-chat') {
           channelInstance.bind('App\\Events\\ChatMessageEvent', (chatData: any) => {
             if (chatData?.content) {
-              // Kick payload'unda rozetler sender.identity.badges veya sender.badges içinde gelebilir
               const extractedBadges: KickBadge[] =
                 chatData.sender?.identity?.badges ||
                 chatData.sender?.badges ||
@@ -239,7 +245,7 @@ function WidgetContent({ slug }: { slug: string }) {
                 color: chatData.sender?.identity?.color || '#53FC18',
                 badges: extractedBadges,
               };
-              setMessages((prev) => [...prev.slice(-12), newMsg]);
+              setMessages((prev) => [...prev.slice(-15), newMsg]);
             }
           });
         }
@@ -264,28 +270,37 @@ function WidgetContent({ slug }: { slug: string }) {
   return (
     <div className="bg-transparent min-h-screen flex items-start justify-start p-4 font-sans select-none overflow-hidden">
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-        {/* 1. Kick Şeffaf Chat Box */}
+        {/* 1. KICK RESMİ SOHBET KATMANI (INLINE STREAM CHAT) */}
         {slug === 'kick-chat' && (
-          <div className="w-96 space-y-2.5">
+          <div className="w-[420px] space-y-2">
             {messages.length === 0 && (
-              <div className="text-xs text-neutral-400 font-mono italic bg-black/50 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10">
+              <div className="text-xs text-neutral-400 font-mono italic bg-black/60 backdrop-blur-md px-3.5 py-2 rounded-lg border border-white/5">
                 Canlı sohbet akışı bekleniyor...
               </div>
             )}
             {messages.map((m) => (
               <div
                 key={m.id}
-                className="bg-black/80 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 text-white text-sm shadow-2xl animate-fadeIn transition-all"
+                className="bg-[#0b0e14]/85 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/5 text-sm leading-[22px] shadow-lg animate-fadeIn text-slate-100"
+                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
               >
-                <div className="flex items-center flex-wrap gap-1.5 mb-1 leading-none">
-                  {m.badges && m.badges.map((b, idx) => <RenderBadge key={idx} badge={b} />)}
-                  <span className="font-bold text-sm tracking-wide" style={{ color: m.color }}>
-                    {m.sender}:
-                  </span>
-                </div>
-                <div className="text-slate-100 text-sm font-normal leading-relaxed break-words">
-                  {renderChatWithEmotes(m.content)}
-                </div>
+                {/* Rozetler */}
+                {m.badges && m.badges.map((b, idx) => (
+                  <KickOfficialBadge key={idx} badge={b} />
+                ))}
+
+                {/* Kullanıcı Adı */}
+                <span
+                  className="font-bold mr-2 text-[13px] tracking-wide align-middle"
+                  style={{ color: m.color || '#53FC18' }}
+                >
+                  {m.sender}:
+                </span>
+
+                {/* Mesaj İçeriği ve Satır İçi Emotelar */}
+                <span className="text-[13px] text-white font-normal align-middle break-words">
+                  {parseKickEmotes(m.content)}
+                </span>
               </div>
             ))}
           </div>
