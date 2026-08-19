@@ -257,6 +257,23 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                   <div className="absolute top-3 left-3 text-[10px] font-mono text-slate-600 uppercase">{t.previewArea}</div>
                   
                   <div style={{ transform: `scale(${scale})`, transition: "transform 0.2s ease" }}>
+                    {widget.id === "events" && (
+  <div className="flex flex-col gap-2 w-72 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl">
+    <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-white/10">
+      <span className="font-bold text-neutral-300 uppercase">{formState.channel || "itsfatih"}</span>
+      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase" style={{ backgroundColor: accent + "20", color: accent }}>Canlı</span>
+    </div>
+    <div className="flex items-center justify-between text-xs py-1">
+      <span className="text-slate-400">Son Takip</span>
+      <span className="font-bold" style={{ color: accent }}>ahmet_kaya</span>
+    </div>
+    <div className="flex items-center justify-between text-xs py-1">
+      <span className="text-slate-400">Son Abone</span>
+      <span className="font-bold text-purple-400">can_demir</span>
+    </div>
+  </div>
+)}
+
                     {widget.id === "kick-viewers" && (
                       <div className="flex items-center gap-3 bg-black/85 backdrop-blur-xl px-5 py-2.5 rounded-2xl border text-white shadow-2xl" style={{ borderColor: `${accent}50` }}>
                         <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: accent }} />
