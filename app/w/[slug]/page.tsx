@@ -11,17 +11,21 @@ interface KickBadge {
   months?: number;
   badge_image?: {
     url?: string;
+    src?: string;
   };
   [key: string]: any;
 }
 
-interface SubscriberBadgeDefinition {
+interface SubscriberBadgeItem {
   id?: number;
-  channel_id?: number;
-  months: number;
-  badge_image: {
-    url: string;
+  months?: number;
+  badge_image?: {
+    url?: string;
+    src?: string;
   };
+  url?: string;
+  src?: string;
+  [key: string]: any;
 }
 
 interface ChatMessage {
@@ -32,49 +36,59 @@ interface ChatMessage {
   badges?: KickBadge[];
 }
 
-// Rozet Görsel Çözümleyici Bileşen
 function KickOfficialBadge({
   badge,
-  channelSubBadges,
+  subBadges,
 }: {
   badge: KickBadge;
-  channelSubBadges: SubscriberBadgeDefinition[];
+  subBadges: SubscriberBadgeItem[];
 }) {
-  // 1. WebSocket doğrudan hazır bir rozet URL'i gönderdiyse
-  if (badge.badge_image?.url) {
+  // 1. WebSocket doğrudan görsel URL'i verdiyse
+  const directImgUrl = badge.badge_image?.url || badge.badge_image?.src || badge.url || badge.src;
+  if (directImgUrl && typeof directImgUrl === 'string') {
     return (
       <img
-        src={badge.badge_image.url}
+        src={directImgUrl}
         alt={badge.type || 'badge'}
-        className="inline-block h-[18px] w-[18px] mr-1.5 align-middle select-none shrink-0 object-contain"
+        className="inline-block h-[18px] w-[18px] mr-1.5 align-middle select-none shrink-0 object-contain rounded-sm"
       />
     );
   }
 
   const type = (badge.type || '').toLowerCase();
-  const subMonths = badge.count || badge.months || 1;
+  
+  // Abone Ay Sayısını Çözümle
+  let subMonths = badge.count || badge.months || 1;
+  if (badge.text && !badge.count && !badge.months) {
+    const parsed = parseInt(badge.text.replace(/\D/g, ''), 10);
+    if (!isNaN(parsed) && parsed > 0) subMonths = parsed;
+  }
 
-  // 2. Abone Rozeti (Kanala Özel Görsel Eşleştirme)
+  // 2. Kanala Özel Abone Rozeti Eşleme
   if (type === 'subscriber' || type === 'sub') {
-    if (channelSubBadges && channelSubBadges.length > 0) {
-      // Kullanıcının ayına en uygun veya en yakın rozeti bul
-      const matched = [...channelSubBadges]
-        .sort((a, b) => b.months - a.months)
-        .find((b) => subMonths >= b.months) || channelSubBadges[0];
+    if (subBadges && subBadges.length > 0) {
+      const sorted = [...subBadges].sort((a, b) => (Number(b.months) || 0) - (Number(a.months) || 0));
+      const matched = sorted.find((b) => subMonths >= (Number(b.months) || 1)) || sorted[sorted.length - 1];
+      
+      const badgeUrl =
+        matched?.badge_image?.url ||
+        matched?.badge_image?.src ||
+        matched?.url ||
+        matched?.src ||
+        (matched?.badge_image && typeof matched.badge_image === 'string' ? matched.badge_image : null);
 
-      if (matched?.badge_image?.url) {
+      if (badgeUrl) {
         return (
           <img
-            src={matched.badge_image.url}
-            alt={`Sub ${subMonths} Ay`}
-            title={`Abone: ${subMonths} Ay`}
-            className="inline-block h-[18px] w-[18px] mr-1.5 align-middle select-none shrink-0 object-contain"
+            src={badgeUrl}
+            alt={`Abone ${subMonths} Ay`}
+            title={`Abone (${subMonths} Ay)`}
+            className="inline-block h-[18px] w-[18px] mr-1.5 align-middle select-none shrink-0 object-contain rounded-sm"
           />
         );
       }
     }
 
-    // Yedek Resmi Kick Abone Rozeti SVG
     return (
       <span
         className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-[3px] bg-[#53FC18]/20 border border-[#53FC18] text-[#53FC18] font-bold text-[10px] mr-1.5 align-middle select-none shrink-0"
@@ -123,7 +137,7 @@ function KickOfficialBadge({
     );
   }
 
-  // 7. Kurucu (Founder)
+  // 7. Founder
   if (type === 'founder') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[3px] bg-[#FFB800] text-black font-black text-[10px] mr-1.5 align-middle select-none shrink-0">
@@ -144,7 +158,6 @@ function KickOfficialBadge({
   return null;
 }
 
-// Emote Ayrıştırıcı
 function parseKickEmotes(content: string) {
   const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_]+)\]/g;
   const nodes = [];
@@ -191,7 +204,7 @@ function WidgetContent({ slug }: { slug: string }) {
   const [viewers, setViewers] = useState<number | null>(null);
   const [isLive, setIsLive] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [channelSubBadges, setChannelSubBadges] = useState<SubscriberBadgeDefinition[]>([]);
+  const [subBadges, setSubBadges] = useState<SubscriberBadgeItem[]>([]);
 
   // Saat
   useEffect(() => {
@@ -211,41 +224,35 @@ function WidgetContent({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [format]);
 
-  // Kick Kanal Verilerini ve Kanala Özel Abone Rozetlerini Çek
-  const fetchKickChannelData = useCallback(async () => {
+  // Tarayıcıdan Doğrudan Kick API Sorgusu (Cloudflare Engeli Yok)
+  const fetchChannelData = useCallback(async () => {
     if (!channel) return null;
     try {
-      const res = await fetch(`https://kick.com/api/v1/channels/${channel.toLowerCase()}?_t=${Date.now()}`);
-      if (!res.ok) {
-        setIsLive(false);
-        setViewers(0);
-        return null;
-      }
+      const res = await fetch(`https://kick.com/api/v1/channels/${channel.toLowerCase()}`);
+      if (!res.ok) return null;
 
       const data = await res.json();
-      const livestream = data?.livestream;
-      const chatroomId = data?.chatroom?.id;
-
-      // Kanala özel abone rozetlerini sakla
+      
+      // Kanalın Özel Rozetlerini Al
       if (data?.subscriber_badges && Array.isArray(data.subscriber_badges)) {
-        setChannelSubBadges(data.subscriber_badges);
+        setSubBadges(data.subscriber_badges);
       }
 
-      if (livestream) {
+      if (data?.livestream) {
         setIsLive(true);
-        setViewers(livestream.viewer_count || 0);
+        setViewers(data.livestream.viewer_count || 0);
       } else {
         setIsLive(false);
         setViewers(0);
       }
 
-      return chatroomId;
+      return data?.chatroom?.id || null;
     } catch {
       return null;
     }
   }, [channel]);
 
-  // Pusher Canlı Dinleyici
+  // Pusher Soket Bağlantısı
   useEffect(() => {
     if ((slug !== 'kick-viewers' && slug !== 'kick-chat') || !channel) return;
 
@@ -253,7 +260,7 @@ function WidgetContent({ slug }: { slug: string }) {
     let channelInstance: any = null;
 
     const init = async () => {
-      const chatroomId = await fetchKickChannelData();
+      const chatroomId = await fetchChannelData();
 
       if (chatroomId) {
         pusher = new Pusher('32cbd69e4b950bf97679', {
@@ -302,7 +309,7 @@ function WidgetContent({ slug }: { slug: string }) {
     init();
 
     const pollInterval = setInterval(() => {
-      if (slug === 'kick-viewers') fetchKickChannelData();
+      if (slug === 'kick-viewers') fetchChannelData();
     }, 15000);
 
     return () => {
@@ -310,14 +317,14 @@ function WidgetContent({ slug }: { slug: string }) {
       if (channelInstance) channelInstance.unbind_all();
       if (pusher) pusher.disconnect();
     };
-  }, [slug, channel, fetchKickChannelData]);
+  }, [slug, channel, fetchChannelData]);
 
   const percentage = Math.min(100, Math.max(0, (current / target) * 100));
 
   return (
     <div className="bg-transparent min-h-screen flex items-start justify-start p-4 font-sans select-none overflow-hidden">
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-        {/* 1. Kick Sohbet Katmanı */}
+        {/* Kick Canlı Chat Katmanı */}
         {slug === 'kick-chat' && (
           <div className="w-[420px] space-y-2">
             {messages.length === 0 && (
@@ -331,17 +338,11 @@ function WidgetContent({ slug }: { slug: string }) {
                 className="bg-[#0b0e14]/85 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/5 text-sm leading-[22px] shadow-lg animate-fadeIn text-slate-100"
                 style={{ textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}
               >
-                {/* Rozetler (Kanala özel abone görselleri ile) */}
                 {m.badges &&
                   m.badges.map((b, idx) => (
-                    <KickOfficialBadge
-                      key={idx}
-                      badge={b}
-                      channelSubBadges={channelSubBadges}
-                    />
+                    <KickOfficialBadge key={idx} badge={b} subBadges={subBadges} />
                   ))}
 
-                {/* Kullanıcı Adı */}
                 <span
                   className="font-bold mr-2 text-[13px] tracking-wide align-middle"
                   style={{ color: m.color || '#53FC18' }}
@@ -349,7 +350,6 @@ function WidgetContent({ slug }: { slug: string }) {
                   {m.sender}:
                 </span>
 
-                {/* Mesaj & Emotelar */}
                 <span className="text-[13px] text-white font-normal align-middle break-words">
                   {parseKickEmotes(m.content)}
                 </span>
@@ -358,7 +358,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 2. Kick Canlı İzleyici */}
+        {/* Kick Canlı İzleyici */}
         {slug === 'kick-viewers' && (
           <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border text-white shadow-2xl" style={{ borderColor: `${accent}40` }}>
             <span className={`w-2.5 h-2.5 rounded-full ${isLive ? 'animate-pulse' : 'bg-neutral-600'}`} style={{ backgroundColor: isLive ? accent : undefined }} />
@@ -369,7 +369,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 3. Goal Bar */}
+        {/* Goal Bar */}
         {slug === 'goal-bar' && (
           <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
             <div className="flex justify-between text-xs font-bold font-mono">
@@ -382,7 +382,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 4. IRL HUD */}
+        {/* IRL HUD */}
         {slug === 'irl-hud' && (
           <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
             <div className="flex items-center gap-2">
@@ -394,7 +394,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 5. Minimal Saat */}
+        {/* Minimal Saat */}
         {slug === 'clock' && (
           <div className="bg-black/85 backdrop-blur-md px-6 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
             <span className="text-xl font-black font-mono tracking-wider">{time}</span>
