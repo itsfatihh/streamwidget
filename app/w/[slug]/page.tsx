@@ -43,7 +43,6 @@ function KickOfficialBadge({
   badge: KickBadge;
   subBadges: SubscriberBadgeItem[];
 }) {
-  // 1. WebSocket doğrudan görsel URL'i verdiyse
   const directImgUrl = badge.badge_image?.url || badge.badge_image?.src || badge.url || badge.src;
   if (directImgUrl && typeof directImgUrl === 'string') {
     return (
@@ -56,15 +55,12 @@ function KickOfficialBadge({
   }
 
   const type = (badge.type || '').toLowerCase();
-  
-  // Abone Ay Sayısını Çözümle
   let subMonths = badge.count || badge.months || 1;
   if (badge.text && !badge.count && !badge.months) {
     const parsed = parseInt(badge.text.replace(/\D/g, ''), 10);
     if (!isNaN(parsed) && parsed > 0) subMonths = parsed;
   }
 
-  // 2. Kanala Özel Abone Rozeti Eşleme
   if (type === 'subscriber' || type === 'sub') {
     if (subBadges && subBadges.length > 0) {
       const sorted = [...subBadges].sort((a, b) => (Number(b.months) || 0) - (Number(a.months) || 0));
@@ -99,7 +95,6 @@ function KickOfficialBadge({
     );
   }
 
-  // 3. Yayıncı Rozeti
   if (type === 'broadcaster' || type === 'streamer') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1.5 rounded-[3px] bg-[#53FC18] text-black font-extrabold text-[10px] uppercase mr-1.5 align-middle select-none shrink-0">
@@ -108,7 +103,6 @@ function KickOfficialBadge({
     );
   }
 
-  // 4. Moderatör Rozeti
   if (type === 'moderator' || type === 'mod') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-[3px] bg-[#00E701] text-black mr-1.5 align-middle select-none shrink-0" title="Moderatör">
@@ -119,7 +113,6 @@ function KickOfficialBadge({
     );
   }
 
-  // 5. VIP
   if (type === 'vip') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1.5 rounded-[3px] bg-[#A970FF] text-white font-extrabold text-[10px] uppercase mr-1.5 align-middle select-none shrink-0">
@@ -128,7 +121,6 @@ function KickOfficialBadge({
     );
   }
 
-  // 6. Doğrulanmış
   if (type === 'verified') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-full bg-[#53FC18] text-black font-black text-[10px] mr-1.5 align-middle select-none shrink-0">
@@ -137,7 +129,6 @@ function KickOfficialBadge({
     );
   }
 
-  // 7. Founder
   if (type === 'founder') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[3px] bg-[#FFB800] text-black font-black text-[10px] mr-1.5 align-middle select-none shrink-0">
@@ -146,7 +137,6 @@ function KickOfficialBadge({
     );
   }
 
-  // 8. OG
   if (type === 'og') {
     return (
       <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[3px] bg-[#00D2FF] text-black font-bold text-[10px] mr-1.5 align-middle select-none shrink-0">
@@ -190,21 +180,33 @@ function parseKickEmotes(content: string) {
   return nodes.length > 0 ? nodes : content;
 }
 
+// Güvenli Sayı Dönüştürücü
+function extractNumber(val: any): number | null {
+  if (val === undefined || val === null) return null;
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    const clean = val.replace(/,/g, '').trim();
+    const num = parseInt(clean, 10);
+    return isNaN(num) ? null : num;
+  }
+  return null;
+}
+
 function WidgetContent({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
   const channel = searchParams.get('channel') || 'itsfatih';
   const format = searchParams.get('format') || '24';
   const accent = searchParams.get('accent') || '#53FC18';
   const scale = Number(searchParams.get('scale') || 100) / 100;
-  const title = searchParams.get('title') || 'HEDEF';
-  const current = Number(searchParams.get('current') || 0);
-  const target = Number(searchParams.get('target') || 100);
+  const title = searchParams.get('title') || 'TAKİPÇİ HEDEFİ';
+  const target = Number(searchParams.get('target') || 500);
 
   const [time, setTime] = useState('');
   const [viewers, setViewers] = useState<number | null>(null);
   const [isLive, setIsLive] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [subBadges, setSubBadges] = useState<SubscriberBadgeItem[]>([]);
+  const [followerCount, setFollowerCount] = useState<number>(0);
 
   // Saat
   useEffect(() => {
@@ -224,68 +226,103 @@ function WidgetContent({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [format]);
 
-  // Tarayıcıdan Doğrudan Kick API Sorgusu (Cloudflare Engeli Yok)
+  // Çoklu Kaynaktan Kick Kanal Verisi Çekici
   const fetchChannelData = useCallback(async () => {
     if (!channel) return null;
+    const cleanChannel = channel.toLowerCase().trim();
+
     try {
-      const res = await fetch(`https://kick.com/api/v1/channels/${channel.toLowerCase()}`);
-      if (!res.ok) return null;
+      // 1. Doğrudan v1 Denemesi
+      const res = await fetch(`https://kick.com/api/v1/channels/${cleanChannel}?_t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        
+        if (data?.subscriber_badges && Array.isArray(data.subscriber_badges)) {
+          setSubBadges(data.subscriber_badges);
+        }
 
-      const data = await res.json();
-      
-      // Kanalın Özel Rozetlerini Al
-      if (data?.subscriber_badges && Array.isArray(data.subscriber_badges)) {
-        setSubBadges(data.subscriber_badges);
+        const count =
+          extractNumber(data?.followersCount) ??
+          extractNumber(data?.followers_count) ??
+          extractNumber(data?.followers) ??
+          extractNumber(data?.user?.followers_count) ??
+          null;
+
+        if (count !== null) setFollowerCount(count);
+
+        if (data?.livestream) {
+          setIsLive(true);
+          setViewers(data.livestream.viewer_count || 0);
+        } else {
+          setIsLive(false);
+          setViewers(0);
+        }
+
+        if (data?.chatroom?.id) return { chatroomId: data.chatroom.id };
       }
 
-      if (data?.livestream) {
-        setIsLive(true);
-        setViewers(data.livestream.viewer_count || 0);
-      } else {
-        setIsLive(false);
-        setViewers(0);
+      // 2. v2 Fallback Denemesi
+      const resV2 = await fetch(`https://kick.com/api/v2/channels/${cleanChannel}?_t=${Date.now()}`);
+      if (resV2.ok) {
+        const dataV2 = await resV2.json();
+        
+        const countV2 =
+          extractNumber(dataV2?.followers_count) ??
+          extractNumber(dataV2?.followersCount) ??
+          extractNumber(dataV2?.followers) ??
+          extractNumber(dataV2?.user?.followers_count) ??
+          null;
+
+        if (countV2 !== null) setFollowerCount(countV2);
+
+        if (dataV2?.livestream) {
+          setIsLive(true);
+          setViewers(dataV2.livestream.viewer_count || 0);
+        }
+
+        if (dataV2?.chatroom?.id) return { chatroomId: dataV2.chatroom.id };
       }
 
-      return data?.chatroom?.id || null;
+      return null;
     } catch {
       return null;
     }
   }, [channel]);
 
-  // Pusher Soket Bağlantısı
+  // Pusher Canlı WebSocket
   useEffect(() => {
-    if ((slug !== 'kick-viewers' && slug !== 'kick-chat') || !channel) return;
+    if (!channel) return;
 
     let pusher: Pusher | null = null;
-    let channelInstance: any = null;
+    let chatroomInstance: any = null;
 
     const init = async () => {
-      const chatroomId = await fetchChannelData();
+      const res = await fetchChannelData();
 
-      if (chatroomId) {
+      if (res?.chatroomId) {
         pusher = new Pusher('32cbd69e4b950bf97679', {
           cluster: 'us2',
           forceTLS: true,
         });
 
-        channelInstance = pusher.subscribe(`chatrooms.${chatroomId}.v2`);
+        chatroomInstance = pusher.subscribe(`chatrooms.${res.chatroomId}.v2`);
 
         if (slug === 'kick-viewers') {
-          channelInstance.bind('App\\Events\\LivestreamUpdated', (eventData: any) => {
+          chatroomInstance.bind('App\\Events\\LivestreamUpdated', (eventData: any) => {
             if (eventData?.livestream) {
               setIsLive(true);
               setViewers(eventData.livestream.viewer_count);
             }
           });
 
-          channelInstance.bind('App\\Events\\LivestreamEnded', () => {
+          chatroomInstance.bind('App\\Events\\LivestreamEnded', () => {
             setIsLive(false);
             setViewers(0);
           });
         }
 
         if (slug === 'kick-chat') {
-          channelInstance.bind('App\\Events\\ChatMessageEvent', (chatData: any) => {
+          chatroomInstance.bind('App\\Events\\ChatMessageEvent', (chatData: any) => {
             if (chatData?.content) {
               const extractedBadges: KickBadge[] =
                 chatData.sender?.identity?.badges ||
@@ -303,28 +340,48 @@ function WidgetContent({ slug }: { slug: string }) {
             }
           });
         }
+
+        if (slug === 'goal-bar') {
+          chatroomInstance.bind('App\\Events\\FollowersUpdated', (data: any) => {
+            const count = extractNumber(data?.followersCount) ?? extractNumber(data?.followers_count);
+            if (count !== null) {
+              setFollowerCount(count);
+            } else {
+              setFollowerCount((prev) => prev + 1);
+            }
+          });
+
+          chatroomInstance.bind('App\\Events\\SubscriptionEvent', () => {
+            setFollowerCount((prev) => prev + 1);
+          });
+
+          chatroomInstance.bind('App\\Events\\GiftedSubscriptionsEvent', (data: any) => {
+            const count = data?.gifted_usernames?.length || 1;
+            setFollowerCount((prev) => prev + count);
+          });
+        }
       }
     };
 
     init();
 
     const pollInterval = setInterval(() => {
-      if (slug === 'kick-viewers') fetchChannelData();
+      fetchChannelData();
     }, 15000);
 
     return () => {
       clearInterval(pollInterval);
-      if (channelInstance) channelInstance.unbind_all();
+      if (chatroomInstance) chatroomInstance.unbind_all();
       if (pusher) pusher.disconnect();
     };
   }, [slug, channel, fetchChannelData]);
 
-  const percentage = Math.min(100, Math.max(0, (current / target) * 100));
+  const percentage = Math.min(100, Math.max(0, (followerCount / target) * 100));
 
   return (
     <div className="bg-transparent min-h-screen flex items-start justify-start p-4 font-sans select-none overflow-hidden">
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-        {/* Kick Canlı Chat Katmanı */}
+        {/* 1. Kick Canlı Chat Katmanı */}
         {slug === 'kick-chat' && (
           <div className="w-[420px] space-y-2">
             {messages.length === 0 && (
@@ -358,7 +415,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* Kick Canlı İzleyici */}
+        {/* 2. Kick Canlı İzleyici */}
         {slug === 'kick-viewers' && (
           <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border text-white shadow-2xl" style={{ borderColor: `${accent}40` }}>
             <span className={`w-2.5 h-2.5 rounded-full ${isLive ? 'animate-pulse' : 'bg-neutral-600'}`} style={{ backgroundColor: isLive ? accent : undefined }} />
@@ -369,20 +426,33 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* Goal Bar */}
+        {/* 3. Otomatik Canlı Hedef Çubuğu */}
         {slug === 'goal-bar' && (
           <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
-            <div className="flex justify-between text-xs font-bold font-mono">
-              <span>{title}</span>
-              <span style={{ color: accent }}>{current.toLocaleString()} / {target.toLocaleString()}</span>
+            <div className="flex justify-between items-center text-xs font-bold font-mono">
+              <span className="tracking-wide text-neutral-200">{title}</span>
+              <span style={{ color: accent }} className="text-sm font-black">
+                {followerCount.toLocaleString()} / {target.toLocaleString()}
+              </span>
             </div>
-            <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percentage}%`, backgroundColor: accent }} />
+            <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-[1px]">
+              <div 
+                className="h-full rounded-full transition-all duration-700 ease-out shadow-sm" 
+                style={{ 
+                  width: `${percentage}%`, 
+                  backgroundColor: accent,
+                  boxShadow: `0 0 12px ${accent}80` 
+                }} 
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-neutral-400">
+              <span>%{Math.round(percentage)}</span>
+              <span>{Math.max(0, target - followerCount)} kaldı</span>
             </div>
           </div>
         )}
 
-        {/* IRL HUD */}
+        {/* 4. IRL HUD */}
         {slug === 'irl-hud' && (
           <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
             <div className="flex items-center gap-2">
@@ -394,7 +464,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* Minimal Saat */}
+        {/* 5. Minimal Saat */}
         {slug === 'clock' && (
           <div className="bg-black/85 backdrop-blur-md px-6 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
             <span className="text-xl font-black font-mono tracking-wider">{time}</span>
