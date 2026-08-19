@@ -48,12 +48,7 @@ export default function Home() {
           desc: "Şık ve cam efektli ekran üzeri dijital saat katmanı.",
           href: "/builder/clock",
         },
-        {
-          id: "events",
-          title: "Son Olaylar (Stream Labels)",
-          desc: "Son takipçi, abone, host ve hediye sub rozetleri (1-3-5 limitli).",
-          href: "/builder/events",
-        },
+        
       ],
     },
     en: {
@@ -97,12 +92,7 @@ export default function Home() {
           desc: "Sleek glassmorphic digital clock overlay for streams.",
           href: "/builder/clock",
         },
-        {
-          id: "events",
-          title: "Stream Labels (Events)",
-          desc: "Latest follower, subscriber, host and gifted sub badges with 1-3-5 limit options.",
-          href: "/builder/events",
-        },
+        
       ],
     },
   };
