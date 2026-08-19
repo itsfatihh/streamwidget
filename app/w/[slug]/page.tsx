@@ -673,13 +673,26 @@ function WidgetContent({ slug }: { slug: string }) {
         
         {/* 7. Son Olaylar (Events / Stream Labels) */}
         {slug === 'events' && (
-          <div className="flex flex-col gap-2 p-2">
-            <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
-              <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: accent || '#53FC18' }} />
-              <span className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: accent || '#53FC18' }}>
-                {channel || 'itsfatih'}
+          <div className="flex flex-col gap-2 p-2 w-full max-w-sm">
+            <div className="flex items-center justify-between bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: accent || '#53FC18' }} />
+                <span className="text-xs font-mono font-bold uppercase text-neutral-200">{channel || 'itsfatih'}</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-white/5 border border-white/10" style={{ color: accent || '#53FC18' }}>
+                CANLI
               </span>
-              <span className="text-xs text-neutral-300 font-mono">Stream Labels Active</span>
+            </div>
+            
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between bg-black/75 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-white/5 text-xs text-white">
+                <span className="text-neutral-400">Son Takip</span>
+                <span className="font-bold font-mono" style={{ color: accent || '#53FC18' }}>ahmet_kaya</span>
+              </div>
+              <div className="flex items-center justify-between bg-black/75 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-white/5 text-xs text-white">
+                <span className="text-neutral-400">Son Abone</span>
+                <span className="font-bold font-mono text-purple-400">can_demir</span>
+              </div>
             </div>
           </div>
         )}
