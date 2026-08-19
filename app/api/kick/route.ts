@@ -10,48 +10,31 @@ export async function GET(request: NextRequest) {
 
   const clean = channel.trim().toLowerCase();
 
-  // 1. Doğrudan veya Proxy ile Chatroom Endpoint'i (En hızlı ve hafif olan)
-  const targetUrl = `https://kick.com/api/v2/channels/${clean}/chatroom`;
-  const proxies = [
-    `https://corsproxy.io/?url=${encodeURIComponent(targetUrl)}`,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
-  ];
-
-  for (const pUrl of proxies) {
-    try {
-      const res = await fetch(pUrl, { next: { revalidate: 60 } });
-      if (res.ok) {
-        const data = await res.json();
-        if (data?.id) {
-          return NextResponse.json({
-            id: data.channel_id || data.id,
-            chatroomId: data.id,
-            slug: clean,
-            username: clean,
-            followersCount: 0,
-          });
-        }
-      }
-    } catch (e) {
-      // Bir sonraki proxy'ye geç
-    }
-  }
-
-  // 2. Full Channel verisi proxy denemesi
+  // 1. Kick API Proxy Resolver
   try {
-    const chanProxy = `https://corsproxy.io/?url=${encodeURIComponent(`https://kick.com/api/v2/channels/${clean}`)}`;
-    const chanRes = await fetch(chanProxy, { next: { revalidate: 60 } });
-    if (chanRes.ok) {
-      const chanData = await chanRes.json();
-      if (chanData?.chatroom?.id) {
-        return NextResponse.json({
-          id: chanData.id,
-          chatroomId: chanData.chatroom.id,
-          slug: clean,
-          username: chanData.user?.username || clean,
-          followersCount: chanData.followers_count || 0,
-        });
-      }
+    const res = await fetch(`https://kick-api.fynity.net/api/v1/channel/${clean}`, {
+      next: { revalidate: 30 },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return NextResponse.json({
+        id: data?.id || data?.chatroom?.channel_id,
+        chatroomId: data?.chatroom?.id || data?.chatroomId,
+        slug: clean,
+        username: data?.user?.username || clean,
+        followersCount: data?.followers_count || data?.followersCount || 0,
+      });
+    }
+  } catch (e) {}
+
+  // 2. Alternatif Genel Proxy
+  try {
+    const res2 = await fetch(`https://kick-proxy.streamwidget.workers.dev/?channel=${clean}`, {
+      next: { revalidate: 30 },
+    });
+    if (res2.ok) {
+      const d = await res2.json();
+      return NextResponse.json(d);
     }
   } catch (e) {}
 
@@ -59,6 +42,6 @@ export async function GET(request: NextRequest) {
     id: null,
     chatroomId: null,
     slug: clean,
-    error: 'Kick chatroom ID alinamadi',
+    error: 'Veri alinamadi',
   });
 }
