@@ -10,72 +10,72 @@ export async function GET(request: NextRequest) {
 
   const clean = channel.trim().toLowerCase();
 
-  const headers = {
-    'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    Accept: 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    Origin: 'https://kick.com',
-    Referer: `https://kick.com/${clean}`,
-  };
-
   try {
-    // 1. Kick v2 Channel
-    let res = await fetch(`https://kick.com/api/v2/channels/${clean}`, {
-      headers,
+    // 1. Kick web sayfasını çek (HTML Cloudflare Bot kontrolünü doğrudan API'ye göre çok daha kolay geçer)
+    const pageRes = await fetch(`https://kick.com/${clean}`, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
       next: { revalidate: 15 },
     });
 
-    // 2. Yedek: Kick v1 Channel
-    if (!res.ok) {
-      res = await fetch(`https://kick.com/api/v1/channels/${clean}`, {
-        headers,
-        next: { revalidate: 15 },
-      });
+    if (!pageRes.ok) {
+      return NextResponse.json({ error: 'Kanal sayfası yüklenemedi' }, { status: pageRes.status });
     }
 
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json({
-        id: data?.id || data?.chatroom?.channel_id,
-        slug: data?.slug || clean,
-        username: data?.user?.username || data?.slug || clean,
-        followersCount: data?.followersCount || data?.followers_count || 0,
-        chatroomId: data?.chatroom?.id,
-        livestream: data?.livestream,
-        subscriberBadges: data?.subscriber_badges || [],
-      });
+    const html = await pageRes.text();
+
+    // 2. Chatroom ID ve Channel ID'yi HTML içerisindeki Next verisi veya Script JSON'dan Regex ile çıkar
+    let chatroomId: string | null = null;
+    let channelId: string | null = null;
+    let followersCount = 0;
+
+    // Chatroom ID arama kalıpları
+    const chatroomMatch = html.match(/"chatroom"\s*:\s*\{\s*"id"\s*:\s*(\d+)/i) || 
+                          html.match(/"chatroom_id"\s*:\s*(\d+)/i) ||
+                          html.match(/"chatroomId"\s*:\s*(\d+)/i);
+    if (chatroomMatch) {
+      chatroomId = chatroomMatch[1];
     }
 
-    // 3. Kick chatroom doğrudan sorgusu
-    const chatRes = await fetch(`https://kick.com/api/v2/channels/${clean}/chatroom`, {
-      headers,
-      next: { revalidate: 15 },
-    });
+    // Channel ID arama kalıpları
+    const channelMatch = html.match(/"channel_id"\s*:\s*(\d+)/i) ||
+                         html.match(/"channelId"\s*:\s*(\d+)/i) ||
+                         html.match(/channel\.(\d+)/);
+    if (channelMatch) {
+      channelId = channelMatch[1];
+    }
 
-    if (chatRes.ok) {
-      const chatData = await chatRes.json();
-      return NextResponse.json({
-        id: chatData?.channel_id,
-        slug: clean,
-        username: clean,
-        followersCount: 0,
-        chatroomId: chatData?.id,
-        livestream: null,
-        subscriberBadges: [],
-      });
+    // Takipçi sayısı kalıpları
+    const followersMatch = html.match(/"followersCount"\s*:\s*(\d+)/i) ||
+                           html.match(/"followers_count"\s*:\s*(\d+)/i);
+    if (followersMatch) {
+      followersCount = parseInt(followersMatch[1], 10);
+    }
+
+    if (!chatroomId && !channelId) {
+      // Alternatif genel fallback araması
+      const idMatch = html.match(/id":(\d+).*?slug":"([^"]+)"/i);
+      if (idMatch && idMatch[2].toLowerCase() === clean) {
+        channelId = idMatch[1];
+        chatroomId = idMatch[1];
+      }
     }
 
     return NextResponse.json({
-      fallback: true,
-      channel: clean,
-      message: 'Client-side fallback required'
+      id: channelId,
+      chatroomId: chatroomId,
+      slug: clean,
+      username: clean,
+      followersCount: followersCount,
     });
   } catch (err: any) {
-    return NextResponse.json({
-      fallback: true,
-      channel: clean,
-      error: err?.message
-    });
+    return NextResponse.json(
+      { error: err?.message || 'Bilinmeyen hata' },
+      { status: 500 }
+    );
   }
 }
