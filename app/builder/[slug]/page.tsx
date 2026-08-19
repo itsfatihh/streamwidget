@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, useEffect, use } from "react";
 import { WIDGETS_LIST } from "@/lib/widgets";
 import Link from "next/link";
 
@@ -17,6 +17,23 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
 
   const [formState, setFormState] = useState<Record<string, string>>(initialForm);
   const [copied, setCopied] = useState(false);
+  const [currentTime, setCurrentTime] = useState("22:15:37");
+
+  // Canlı Önizleme Saati
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentTime(
+        now.toLocaleTimeString("tr-TR", {
+          hour12: formState.format === "12",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        })
+      );
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [formState.format]);
 
   if (!widget) {
     return (
@@ -29,7 +46,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
 
   const searchParams = new URLSearchParams();
   Object.entries(formState).forEach(([key, val]) => {
-    if (val) searchParams.set(key, val);
+    if (val !== undefined && val !== "") searchParams.set(key, val);
   });
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
@@ -43,7 +60,13 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
   };
 
   const scale = Number(formState.scale || 100) / 100;
-  const accent = formState.accent || "#53FC18";
+  const accent = formState.accent || (slug === "sub-goal" ? "#A970FF" : "#53FC18");
+
+  // IRL HUD Önizleme Konumu
+  const previewLocation =
+    formState.location && formState.location.toLowerCase() !== "auto"
+      ? formState.location
+      : "Palavas-les-Flots";
 
   return (
     <div className="min-h-screen bg-[#090b10] text-slate-100 font-sans relative pb-16">
@@ -80,7 +103,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                     <input
                       type={f.type}
                       placeholder={f.placeholder}
-                      value={formState[f.name] || ""}
+                      value={formState[f.name] ?? ""}
                       onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
                       className="w-full bg-[#12161f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
                     />
@@ -145,21 +168,89 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                       </div>
                     )}
 
-                    {widget.id === "goal-bar" && (
+                    {widget.id === "follower-goal" && (
                       <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
-                        <div className="flex justify-between text-xs font-bold font-mono">
-                          <span>{formState.title || "HEDEF"}</span>
-                          <span style={{ color: accent }}>{formState.current || 0} / {formState.target || 100}</span>
+                        <div className="flex justify-between items-center text-xs font-bold font-mono">
+                          <span className="text-neutral-200">{formState.title || "TAKİPÇİ HEDEFİ"}</span>
+                          <span style={{ color: accent }} className="text-sm font-black">340 / {formState.target || 500}</span>
                         </div>
-                        <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden">
+                        <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-[1px]">
                           <div 
-                            className="h-full rounded-full transition-all duration-500" 
+                            className="h-full rounded-full transition-all duration-500 shadow-sm" 
+                            style={{ width: `68%`, backgroundColor: accent, boxShadow: `0 0 10px ${accent}80` }} 
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] font-mono text-neutral-400">
+                          <span>%68</span>
+                          <span>160 kaldı</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {widget.id === "sub-goal" && (
+                      <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
+                        <div className="flex justify-between items-center text-xs font-bold font-mono">
+                          <span className="text-neutral-200">{formState.title || "ABONE HEDEFİ"}</span>
+                          <span style={{ color: accent }} className="text-sm font-black">
+                            {formState.current || 0} / {formState.target || 25}
+                          </span>
+                        </div>
+                        <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-[1px]">
+                          <div 
+                            className="h-full rounded-full transition-all duration-500 shadow-sm" 
                             style={{ 
-                              width: `${Math.min(100, (Number(formState.current || 0) / Number(formState.target || 100)) * 100)}%`,
-                              backgroundColor: accent 
+                              width: `${Math.min(100, (Number(formState.current || 0) / Number(formState.target || 25)) * 100)}%`, 
+                              backgroundColor: accent, 
+                              boxShadow: `0 0 10px ${accent}80` 
                             }} 
                           />
                         </div>
+                        <div className="flex justify-between text-[10px] font-mono text-neutral-400">
+                          <span>%{Math.round(Math.min(100, (Number(formState.current || 0) / Number(formState.target || 25)) * 100))}</span>
+                          <span>Canlı Abone Hedefi</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {widget.id === "irl-hud" && (
+                      <div className="inline-flex items-center gap-3.5 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl text-xs font-semibold">
+                        {formState.showLive !== "false" && (
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-[11px] font-black tracking-widest text-red-400">LIVE</span>
+                          </div>
+                        )}
+                        
+                        {formState.showClock !== "false" && (
+                          <>
+                            {formState.showLive !== "false" && <div className="h-4 w-[1px] bg-white/20" />}
+                            <span className="font-mono tracking-wide text-slate-100">{currentTime}</span>
+                          </>
+                        )}
+
+                        {formState.showLocation !== "false" && (
+                          <>
+                            {(formState.showLive !== "false" || formState.showClock !== "false") && (
+                              <div className="h-4 w-[1px] bg-white/20" />
+                            )}
+                            <span className="flex items-center gap-1.5 text-slate-300 font-medium">
+                              <span className="text-emerald-400 text-sm">📍</span>
+                              <span>{previewLocation}</span>
+                            </span>
+                          </>
+                        )}
+
+                        {formState.showWeather !== "false" && (
+                          <>
+                            {(formState.showLive !== "false" || formState.showClock !== "false" || formState.showLocation !== "false") && (
+                              <div className="h-4 w-[1px] bg-white/20" />
+                            )}
+                            <span className="flex items-center gap-1.5 text-amber-300 font-mono font-bold">
+                              <span>☀️</span>
+                              <span>25°C</span>
+                            </span>
+                          </>
+                        )}
                       </div>
                     )}
 
@@ -169,27 +260,12 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                           <span>moderator:</span>
                           <span className="text-slate-200 font-normal">Yayın harika gidiyor! 🔥</span>
                         </div>
-                        <div className="flex items-center gap-1.5 font-bold text-cyan-400">
-                          <span>izleyici99:</span>
-                          <span className="text-slate-200 font-normal">Yeni widgetler çok iyi olmuş</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {widget.id === "irl-hud" && (
-                      <div className="flex items-center gap-3 bg-black/85 backdrop-blur-xl px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                          <span className="text-xs font-black tracking-widest text-red-400">LIVE</span>
-                        </div>
-                        <div className="h-4 w-[1px] bg-white/20" />
-                        <span className="text-sm font-semibold font-mono tracking-wide">19:54:02</span>
                       </div>
                     )}
 
                     {widget.id === "clock" && (
                       <div className="bg-black/85 backdrop-blur-xl px-7 py-3 rounded-2xl border border-white/10 text-white shadow-2xl">
-                        <span className="text-2xl font-black font-mono tracking-wider">19:54:02</span>
+                        <span className="text-2xl font-black font-mono tracking-wider">{currentTime}</span>
                       </div>
                     )}
                   </div>
@@ -197,7 +273,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
               </div>
 
               <div className="mt-6 p-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-400 flex items-center justify-between">
-                <span>💡 Seçtiğin renk, boyut ve değerler otomatik olarak OBS bağlantısına eklenir.</span>
+                <span>💡 Soldaki ayarlarla oynadıkça önizleme anlık olarak güncellenir.</span>
               </div>
             </div>
           </div>
