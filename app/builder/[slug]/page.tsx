@@ -49,7 +49,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
   const [copied, setCopied] = useState(false);
   const [currentTime, setCurrentTime] = useState("22:15:37");
 
-  const [autoCity, setAutoCity] = useState<string>("Konum aranıyor...");
+  const [autoCity, setAutoCity] = useState<string>("Palavas-les-Flots");
   const [autoTemp, setAutoTemp] = useState<string>("25°C");
   const [weatherCode, setWeatherCode] = useState<number>(0);
 
@@ -127,11 +127,14 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
   if (!widget) {
     return (
       <div className="min-h-screen bg-[#090b10] text-white flex flex-col items-center justify-center p-6 font-sans">
-        <h1 className="text-2xl font-bold mb-2">Widget Bulunamadı</h1>
-        <Link href="/" className="text-emerald-400 underline text-sm">Vitrine Dön</Link>
+        <h1 className="text-2xl font-bold mb-2">Widget Not Found</h1>
+        <Link href="/" className="text-emerald-400 underline text-sm">{t.catalog}</Link>
       </div>
     );
   }
+
+  const widgetName = widget.name[lang] || widget.name.en || widget.name.tr;
+  const widgetDesc = widget.description[lang] || widget.description.en || widget.description.tr;
 
   const searchParams = new URLSearchParams();
   Object.entries(formState).forEach(([key, val]) => {
@@ -160,7 +163,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
           </Link>
           <div className="flex items-center gap-3">
             <span className="text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
-              {widget.name}
+              {widgetName}
             </span>
             <LanguageSelector currentLang={lang} onSelectLang={handleLangChange} />
           </div>
@@ -169,8 +172,8 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
 
       <main className="max-w-6xl mx-auto px-6 mt-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">{widget.name}</h1>
-          <p className="text-slate-400 text-sm mt-1">{widget.description}</p>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">{widgetName}</h1>
+          <p className="text-slate-400 text-sm mt-1">{widgetDesc}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -180,44 +183,52 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                 <span className="w-2 h-2 rounded-full bg-emerald-400" /> {t.settings}
               </h2>
 
-              {widget.fields.map((f) => (
-                <div key={f.name} className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-300 flex justify-between">
-                    <span>{f.label}</span>
-                  </label>
-                  {(f.type === "text" || f.type === "number") && (
-                    <input
-                      type={f.type}
-                      placeholder={f.placeholder}
-                      value={formState[f.name] ?? ""}
-                      onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
-                      className="w-full bg-[#12161f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
-                    />
-                  )}
-                  {f.type === "color" && (
-                    <div className="flex items-center gap-3 bg-[#12161f] border border-white/10 rounded-xl p-2">
+              {widget.fields.map((f) => {
+                const fieldLabel = f.label[lang] || f.label.en || f.label.tr;
+                return (
+                  <div key={f.name} className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-300 flex justify-between">
+                      <span>{fieldLabel}</span>
+                    </label>
+                    {(f.type === "text" || f.type === "number") && (
                       <input
-                        type="color"
+                        type={f.type}
+                        placeholder={f.placeholder}
+                        value={formState[f.name] ?? ""}
+                        onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
+                        className="w-full bg-[#12161f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
+                      />
+                    )}
+                    {f.type === "color" && (
+                      <div className="flex items-center gap-3 bg-[#12161f] border border-white/10 rounded-xl p-2">
+                        <input
+                          type="color"
+                          value={formState[f.name] || (f.defaultValue as string)}
+                          onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
+                          className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-0"
+                        />
+                        <span className="text-xs font-mono uppercase text-slate-300">{formState[f.name] || f.defaultValue}</span>
+                      </div>
+                    )}
+                    {f.type === "select" && (
+                      <select
                         value={formState[f.name] || (f.defaultValue as string)}
                         onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
-                        className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-0"
-                      />
-                      <span className="text-xs font-mono uppercase text-slate-300">{formState[f.name] || f.defaultValue}</span>
-                    </div>
-                  )}
-                  {f.type === "select" && (
-                    <select
-                      value={formState[f.name] || (f.defaultValue as string)}
-                      onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
-                      className="w-full bg-[#12161f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-400 transition"
-                    >
-                      {f.options?.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              ))}
+                        className="w-full bg-[#12161f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-400 transition"
+                      >
+                        {f.options?.map((opt) => {
+                          const optLabel = opt.label[lang] || opt.label.en || opt.label.tr;
+                          return (
+                            <option key={opt.value} value={opt.value}>
+                              {optLabel}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="glass-card rounded-2xl p-6 space-y-4 border border-white/5">
@@ -257,7 +268,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                     {widget.id === "follower-goal" && (
                       <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
                         <div className="flex justify-between items-center text-xs font-bold font-mono">
-                          <span className="text-neutral-200">{formState.title || "TAKİPÇİ HEDEFİ"}</span>
+                          <span className="text-neutral-200">{formState.title || "FOLLOWER GOAL"}</span>
                           <span style={{ color: accent }} className="text-sm font-black">340 / {formState.target || 500}</span>
                         </div>
                         <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-[1px]">
@@ -268,7 +279,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                         </div>
                         <div className="flex justify-between text-[10px] font-mono text-neutral-400">
                           <span>%68</span>
-                          <span>160 kaldı</span>
+                          <span>160</span>
                         </div>
                       </div>
                     )}
@@ -276,7 +287,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                     {widget.id === "sub-goal" && (
                       <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
                         <div className="flex justify-between items-center text-xs font-bold font-mono">
-                          <span className="text-neutral-200">{formState.title || "ABONE HEDEFİ"}</span>
+                          <span className="text-neutral-200">{formState.title || "SUB GOAL"}</span>
                           <span style={{ color: accent }} className="text-sm font-black">
                             {formState.current || 0} / {formState.target || 25}
                           </span>

@@ -23,29 +23,8 @@ export default function HomePage() {
 
   const t = TRANSLATIONS[lang] || TRANSLATIONS.tr;
 
-  // Widget ID'sine göre doğrudan çevrilmiş başlık ve açıklama fonksiyonu
-  const getWidgetInfo = (id: string) => {
-    switch (id) {
-      case "kick-viewers":
-        return { name: t.w_viewers_name, desc: t.w_viewers_desc };
-      case "kick-chat":
-        return { name: t.w_chat_name, desc: t.w_chat_desc };
-      case "follower-goal":
-        return { name: t.w_fgoal_name, desc: t.w_fgoal_desc };
-      case "sub-goal":
-        return { name: t.w_sgoal_name, desc: t.w_sgoal_desc };
-      case "irl-hud":
-        return { name: t.w_irl_name, desc: t.w_irl_desc };
-      case "clock":
-        return { name: t.w_clock_name, desc: t.w_clock_desc };
-      default:
-        return { name: id, desc: "" };
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#090b10] text-slate-100 font-sans relative pb-20">
-      {/* Üst Bar */}
       <header className="border-b border-white/5 bg-[#090b10]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -61,7 +40,6 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero Bölümü */}
       <main className="max-w-6xl mx-auto px-6 mt-12">
         <div className="text-center max-w-2xl mx-auto mb-14 space-y-3">
           <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
@@ -72,10 +50,11 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Widget Kartları Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {WIDGETS_LIST.map((w) => {
-            const info = getWidgetInfo(w.id);
+            const widgetName = w.name[lang] || w.name.en || w.name.tr;
+            const widgetDesc = w.description[lang] || w.description.en || w.description.tr;
+
             return (
               <div
                 key={w.id}
@@ -88,10 +67,10 @@ export default function HomePage() {
                     </span>
                   </div>
                   <h3 className="text-lg font-bold text-white group-hover:text-emerald-400 transition">
-                    {info.name}
+                    {widgetName}
                   </h3>
                   <p className="text-slate-400 text-xs mt-2 leading-relaxed">
-                    {info.desc}
+                    {widgetDesc}
                   </p>
                 </div>
 
