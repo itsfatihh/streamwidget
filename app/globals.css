@@ -1,11 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 @layer base {
   body {
-    @apply bg-[#0b0e14] text-slate-100 antialiased selection:bg-emerald-500 selection:text-black;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-color: #090b10;
+    color: #f8fafc;
   }
 }
 
