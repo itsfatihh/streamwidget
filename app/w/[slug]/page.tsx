@@ -149,6 +149,7 @@ function KickOfficialBadge({
 }
 
 function parseKickEmotes(content: string) {
+  if (!content) return '';
   const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_]+)\]/g;
   const nodes = [];
   let lastIndex = 0;
@@ -180,7 +181,6 @@ function parseKickEmotes(content: string) {
   return nodes.length > 0 ? nodes : content;
 }
 
-// Güvenli Sayı Dönüştürücü
 function extractNumber(val: any): number | null {
   if (val === undefined || val === null) return null;
   if (typeof val === 'number') return val;
@@ -196,17 +196,27 @@ function WidgetContent({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
   const channel = searchParams.get('channel') || 'itsfatih';
   const format = searchParams.get('format') || '24';
-  const accent = searchParams.get('accent') || '#53FC18';
-  const scale = Number(searchParams.get('scale') || 100) / 100;
-  const title = searchParams.get('title') || 'TAKİPÇİ HEDEFİ';
-  const target = Number(searchParams.get('target') || 500);
+  
+  const defaultAccent = slug === 'sub-goal' ? '#A970FF' : '#53FC18';
+  const defaultTitle = slug === 'sub-goal' ? 'ABONE HEDEFİ' : (slug === 'follower-goal' ? 'TAKİPÇİ HEDEFİ' : 'HEDEF');
+  const defaultTarget = slug === 'sub-goal' ? 25 : 500;
+  
+  const currentParam = searchParams.get('current');
+  const initialCurrent = currentParam ? Number(currentParam) : 0;
 
-  const [time, setTime] = useState('');
+  const accent = searchParams.get('accent') || defaultAccent;
+  const scale = Number(searchParams.get('scale') || 100) / 100;
+  const title = searchParams.get('title') || defaultTitle;
+  const target = Number(searchParams.get('target') || defaultTarget);
+
+  const [time, setTime] = useState('00:00:00');
   const [viewers, setViewers] = useState<number | null>(null);
   const [isLive, setIsLive] = useState<boolean>(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [subBadges, setSubBadges] = useState<SubscriberBadgeItem[]>([]);
+  
   const [followerCount, setFollowerCount] = useState<number>(0);
+  const [subCount, setSubCount] = useState<number>(initialCurrent);
 
   // Saat
   useEffect(() => {
@@ -226,13 +236,12 @@ function WidgetContent({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [format]);
 
-  // Çoklu Kaynaktan Kick Kanal Verisi Çekici
+  // Kick Kanal Verilerini Çek
   const fetchChannelData = useCallback(async () => {
     if (!channel) return null;
     const cleanChannel = channel.toLowerCase().trim();
 
     try {
-      // 1. Doğrudan v1 Denemesi
       const res = await fetch(`https://kick.com/api/v1/channels/${cleanChannel}?_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
@@ -241,14 +250,23 @@ function WidgetContent({ slug }: { slug: string }) {
           setSubBadges(data.subscriber_badges);
         }
 
-        const count =
+        const fCount =
           extractNumber(data?.followersCount) ??
           extractNumber(data?.followers_count) ??
           extractNumber(data?.followers) ??
           extractNumber(data?.user?.followers_count) ??
           null;
 
-        if (count !== null) setFollowerCount(count);
+        if (fCount !== null) setFollowerCount(fCount);
+
+        if (!currentParam) {
+          const sCount =
+            extractNumber(data?.subscribers_count) ??
+            extractNumber(data?.subscribersCount) ??
+            extractNumber(data?.subscriber_count) ??
+            null;
+          if (sCount !== null && sCount > 0) setSubCount(sCount);
+        }
 
         if (data?.livestream) {
           setIsLive(true);
@@ -261,35 +279,13 @@ function WidgetContent({ slug }: { slug: string }) {
         if (data?.chatroom?.id) return { chatroomId: data.chatroom.id };
       }
 
-      // 2. v2 Fallback Denemesi
-      const resV2 = await fetch(`https://kick.com/api/v2/channels/${cleanChannel}?_t=${Date.now()}`);
-      if (resV2.ok) {
-        const dataV2 = await resV2.json();
-        
-        const countV2 =
-          extractNumber(dataV2?.followers_count) ??
-          extractNumber(dataV2?.followersCount) ??
-          extractNumber(dataV2?.followers) ??
-          extractNumber(dataV2?.user?.followers_count) ??
-          null;
-
-        if (countV2 !== null) setFollowerCount(countV2);
-
-        if (dataV2?.livestream) {
-          setIsLive(true);
-          setViewers(dataV2.livestream.viewer_count || 0);
-        }
-
-        if (dataV2?.chatroom?.id) return { chatroomId: dataV2.chatroom.id };
-      }
-
       return null;
     } catch {
       return null;
     }
-  }, [channel]);
+  }, [channel, currentParam]);
 
-  // Pusher Canlı WebSocket
+  // Pusher WebSocket Dinleyicisi
   useEffect(() => {
     if (!channel) return;
 
@@ -341,7 +337,7 @@ function WidgetContent({ slug }: { slug: string }) {
           });
         }
 
-        if (slug === 'goal-bar') {
+        if (slug === 'follower-goal') {
           chatroomInstance.bind('App\\Events\\FollowersUpdated', (data: any) => {
             const count = extractNumber(data?.followersCount) ?? extractNumber(data?.followers_count);
             if (count !== null) {
@@ -350,14 +346,16 @@ function WidgetContent({ slug }: { slug: string }) {
               setFollowerCount((prev) => prev + 1);
             }
           });
+        }
 
+        if (slug === 'sub-goal') {
           chatroomInstance.bind('App\\Events\\SubscriptionEvent', () => {
-            setFollowerCount((prev) => prev + 1);
+            setSubCount((prev) => prev + 1);
           });
 
           chatroomInstance.bind('App\\Events\\GiftedSubscriptionsEvent', (data: any) => {
             const count = data?.gifted_usernames?.length || 1;
-            setFollowerCount((prev) => prev + count);
+            setSubCount((prev) => prev + count);
           });
         }
       }
@@ -376,12 +374,13 @@ function WidgetContent({ slug }: { slug: string }) {
     };
   }, [slug, channel, fetchChannelData]);
 
-  const percentage = Math.min(100, Math.max(0, (followerCount / target) * 100));
+  const currentGoalValue = slug === 'sub-goal' ? subCount : followerCount;
+  const percentage = Math.min(100, Math.max(0, (currentGoalValue / target) * 100));
 
   return (
-    <div className="bg-transparent min-h-screen flex items-start justify-start p-4 font-sans select-none overflow-hidden">
+    <div className="bg-transparent min-h-screen p-4 font-sans select-none overflow-hidden block">
       <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-        {/* 1. Kick Canlı Chat Katmanı */}
+        {/* 1. Kick Chat */}
         {slug === 'kick-chat' && (
           <div className="w-[420px] space-y-2">
             {messages.length === 0 && (
@@ -417,7 +416,7 @@ function WidgetContent({ slug }: { slug: string }) {
 
         {/* 2. Kick Canlı İzleyici */}
         {slug === 'kick-viewers' && (
-          <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border text-white shadow-2xl" style={{ borderColor: `${accent}40` }}>
+          <div className="inline-flex items-center gap-3 bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border text-white shadow-2xl" style={{ borderColor: `${accent}40` }}>
             <span className={`w-2.5 h-2.5 rounded-full ${isLive ? 'animate-pulse' : 'bg-neutral-600'}`} style={{ backgroundColor: isLive ? accent : undefined }} />
             <span className="text-xs font-mono font-bold text-neutral-300 uppercase">{channel}</span>
             <span className="text-sm font-black font-mono" style={{ color: accent }}>
@@ -426,7 +425,59 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 3. Otomatik Canlı Hedef Çubuğu */}
+        {/* 3. Takipçi Hedefi (Follower Goal) */}
+        {slug === 'follower-goal' && (
+          <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
+            <div className="flex justify-between items-center text-xs font-bold font-mono">
+              <span className="tracking-wide text-neutral-200">{title}</span>
+              <span style={{ color: accent }} className="text-sm font-black">
+                {followerCount.toLocaleString()} / {target.toLocaleString()}
+              </span>
+            </div>
+            <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-[1px]">
+              <div 
+                className="h-full rounded-full transition-all duration-700 ease-out shadow-sm" 
+                style={{ 
+                  width: `${percentage}%`, 
+                  backgroundColor: accent,
+                  boxShadow: `0 0 12px ${accent}80` 
+                }} 
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-neutral-400">
+              <span>%{Math.round(percentage)}</span>
+              <span>{Math.max(0, target - followerCount)} takipçi kaldı</span>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Abone Hedefi (Sub Goal) */}
+        {slug === 'sub-goal' && (
+          <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
+            <div className="flex justify-between items-center text-xs font-bold font-mono">
+              <span className="tracking-wide text-neutral-200">{title}</span>
+              <span style={{ color: accent }} className="text-sm font-black">
+                {subCount.toLocaleString()} / {target.toLocaleString()}
+              </span>
+            </div>
+            <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-[1px]">
+              <div 
+                className="h-full rounded-full transition-all duration-700 ease-out shadow-sm" 
+                style={{ 
+                  width: `${percentage}%`, 
+                  backgroundColor: accent,
+                  boxShadow: `0 0 12px ${accent}80` 
+                }} 
+              />
+            </div>
+            <div className="flex justify-between text-[10px] font-mono text-neutral-400">
+              <span>%{Math.round(percentage)}</span>
+              <span>{Math.max(0, target - subCount)} abone kaldı</span>
+            </div>
+          </div>
+        )}
+
+        {/* 5. Goal Bar (Eski linkler için geriye dönük uyumluluk) */}
         {slug === 'goal-bar' && (
           <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
             <div className="flex justify-between items-center text-xs font-bold font-mono">
@@ -452,9 +503,9 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 4. IRL HUD */}
+        {/* 6. IRL HUD */}
         {slug === 'irl-hud' && (
-          <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
+          <div className="inline-flex items-center gap-3 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
               <span className="text-xs font-black tracking-widest text-red-400">LIVE</span>
@@ -464,9 +515,9 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 5. Minimal Saat */}
+        {/* 7. Minimal Saat */}
         {slug === 'clock' && (
-          <div className="bg-black/85 backdrop-blur-md px-6 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
+          <div className="inline-block bg-black/85 backdrop-blur-md px-6 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
             <span className="text-xl font-black font-mono tracking-wider">{time}</span>
           </div>
         )}
@@ -478,7 +529,7 @@ function WidgetContent({ slug }: { slug: string }) {
 export default function DynamicWidgetPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div className="bg-transparent min-h-screen" />}>
       <WidgetContent slug={slug} />
     </Suspense>
   );
