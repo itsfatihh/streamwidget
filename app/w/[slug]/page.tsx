@@ -1,4 +1,7 @@
 'use client';
+import { WIDGETS_LIST } from "@/lib/widgets";
+
+
 
 import { use, useEffect, useState, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -205,6 +208,9 @@ function getWeatherIcon(code: number) {
 }
 
 function WidgetContent({ slug }: { slug: string }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return <div className="bg-transparent min-h-screen" />;
   const searchParams = useSearchParams();
   const channel = searchParams.get('channel') || 'itsfatih';
   const format = searchParams.get('format') || '24';
@@ -666,6 +672,20 @@ function WidgetContent({ slug }: { slug: string }) {
         )}
 
         {/* 6. Minimal Saat */}
+        
+        {/* 7. Son Olaylar (Events / Stream Labels) */}
+        {slug === 'events' && (
+          <div className="flex flex-col gap-2 p-2">
+            <div className="flex items-center gap-3 bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
+              <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: accent || '#53FC18' }} />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: accent || '#53FC18' }}>
+                {channel || 'itsfatih'}
+              </span>
+              <span className="text-xs text-neutral-300 font-mono">Stream Labels Active</span>
+            </div>
+          </div>
+        )}
+
         {slug === 'clock' && (
           <div className="inline-block bg-black/85 backdrop-blur-md px-6 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl">
             <span className="text-xl font-black font-mono tracking-wider">{time}</span>
@@ -684,3 +704,5 @@ export default function DynamicWidgetPage({ params }: { params: Promise<{ slug: 
     </Suspense>
   );
 }
+
+

@@ -1,5 +1,4 @@
-"use client";
-
+'use client';
 import { useState, useEffect, use } from "react";
 import { WIDGETS_LIST } from "@/lib/widgets";
 import { TRANSLATIONS, LangCode } from "@/lib/i18n";
@@ -396,3 +395,5 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
     </div>
   );
 }
+
+
