@@ -208,9 +208,7 @@ function getWeatherIcon(code: number) {
 }
 
 function WidgetContent({ slug }: { slug: string }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-  if (!mounted) return <div className="bg-transparent min-h-screen" />;
+  
   const searchParams = useSearchParams();
   const channel = searchParams.get('channel') || 'itsfatih';
   const format = searchParams.get('format') || '24';
