@@ -209,11 +209,11 @@ function WidgetContent({ slug }: { slug: string }) {
   const channel = searchParams.get('channel') || 'itsfatih';
   const format = searchParams.get('format') || '24';
   
-  // IRL HUD Parametreleri (Varsayılan olarak hepsi açık)
+  // IRL HUD Parametreleri
   const showLive = searchParams.get('showLive') !== 'false';
   const showClock = searchParams.get('showClock') !== 'false';
   const showLocation = searchParams.get('showLocation') !== 'false';
-  const rawLocation = searchParams.get('location') || 'auto';
+  const initialRawLocation = searchParams.get('location') || 'auto';
   const showWeather = searchParams.get('showWeather') !== 'false';
 
   const defaultAccent = slug === 'sub-goal' ? '#A970FF' : '#53FC18';
@@ -237,8 +237,9 @@ function WidgetContent({ slug }: { slug: string }) {
   const [followerCount, setFollowerCount] = useState<number>(0);
   const [subCount, setSubCount] = useState<number>(initialCurrent);
   
-  // Konum & Hava Durumu (Başlangıçta boş kalmaz)
-  const [cityName, setCityName] = useState<string>(rawLocation !== 'auto' && rawLocation ? rawLocation : 'Konum aranıyor...');
+  // Dinamik Konum & Canlı Komut State'i
+  const [activeLocationQuery, setActiveLocationQuery] = useState<string>(initialRawLocation);
+  const [cityName, setCityName] = useState<string>(initialRawLocation !== 'auto' && initialRawLocation ? initialRawLocation : 'Konum aranıyor...');
   const [temperature, setTemperature] = useState<string>('...');
   const [weatherCode, setWeatherCode] = useState<number>(0);
 
@@ -260,63 +261,60 @@ function WidgetContent({ slug }: { slug: string }) {
     return () => clearInterval(interval);
   }, [format]);
 
-  // 2. Otomatik Konum ve Hava Durumu (Çoklu Güvenilir Servis)
+  // 2. Konum ve Hava Durumu Çözümleyici
+  const resolveLocationAndWeather = useCallback(async (locQuery: string) => {
+    let lat: number | null = null;
+    let lon: number | null = null;
+    let detectedName = '';
+
+    try {
+      if (!locQuery || locQuery.toLowerCase() === 'auto') {
+        const ipRes = await fetch('https://ipwho.is/');
+        if (ipRes.ok) {
+          const ipData = await ipRes.json();
+          if (ipData?.success) {
+            detectedName = ipData.city || ipData.region || 'Canlı Konum';
+            lat = ipData.latitude;
+            lon = ipData.longitude;
+            setCityName(detectedName);
+          }
+        }
+      } else {
+        detectedName = locQuery;
+        setCityName(detectedName);
+        const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locQuery)}&count=1&language=tr&format=json`);
+        if (geoRes.ok) {
+          const geoData = await geoRes.json();
+          if (geoData?.results?.[0]) {
+            lat = geoData.results[0].latitude;
+            lon = geoData.results[0].longitude;
+          }
+        }
+      }
+
+      if (lat !== null && lon !== null) {
+        const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`);
+        if (wRes.ok) {
+          const wData = await wRes.json();
+          if (wData?.current) {
+            setTemperature(`${Math.round(wData.current.temperature_2m)}°C`);
+            setWeatherCode(wData.current.weather_code);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Weather error:', err);
+      if (!detectedName) setCityName('Canlı Konum');
+      setTemperature('24°C');
+    }
+  }, []);
+
   useEffect(() => {
     if (slug !== 'irl-hud') return;
-
-    const fetchGeoAndWeather = async () => {
-      let lat: number | null = null;
-      let lon: number | null = null;
-      let detectedName = '';
-
-      try {
-        if (!rawLocation || rawLocation.toLowerCase() === 'auto') {
-          // HTTPS Destekli ipwho.is (CORS serbest)
-          const ipRes = await fetch('https://ipwho.is/');
-          if (ipRes.ok) {
-            const ipData = await ipRes.json();
-            if (ipData?.success) {
-              detectedName = ipData.city || ipData.region || 'Canlı Konum';
-              lat = ipData.latitude;
-              lon = ipData.longitude;
-              setCityName(detectedName);
-            }
-          }
-        } else {
-          detectedName = rawLocation;
-          setCityName(detectedName);
-          const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(rawLocation)}&count=1&language=tr&format=json`);
-          if (geoRes.ok) {
-            const geoData = await geoRes.json();
-            if (geoData?.results?.[0]) {
-              lat = geoData.results[0].latitude;
-              lon = geoData.results[0].longitude;
-            }
-          }
-        }
-
-        // Hava durumu çek
-        if (lat !== null && lon !== null) {
-          const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`);
-          if (wRes.ok) {
-            const wData = await wRes.json();
-            if (wData?.current) {
-              setTemperature(`${Math.round(wData.current.temperature_2m)}°C`);
-              setWeatherCode(wData.current.weather_code);
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Weather error:', err);
-        if (!detectedName) setCityName('Canlı Konum');
-        setTemperature('24°C');
-      }
-    };
-
-    fetchGeoAndWeather();
-    const interval = setInterval(fetchGeoAndWeather, 5 * 60 * 1000);
+    resolveLocationAndWeather(activeLocationQuery);
+    const interval = setInterval(() => resolveLocationAndWeather(activeLocationQuery), 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [slug, rawLocation]);
+  }, [slug, activeLocationQuery, resolveLocationAndWeather]);
 
   // 3. Kick Kanal Verileri
   const fetchChannelData = useCallback(async () => {
@@ -367,7 +365,7 @@ function WidgetContent({ slug }: { slug: string }) {
     }
   }, [channel, currentParam]);
 
-  // 4. Pusher WebSocket Dinleyicisi
+  // 4. Pusher WebSocket (Canlı Chat Komutları & Takip/Abone)
   useEffect(() => {
     if (!channel) return;
 
@@ -385,6 +383,44 @@ function WidgetContent({ slug }: { slug: string }) {
 
         chatroomInstance = pusher.subscribe(`chatrooms.${res.chatroomId}.v2`);
 
+        // Chat Dinleyicisi & Canlı Mod Komutu (!konum ŞehirAdı)
+        chatroomInstance.bind('App\\Events\\ChatMessageEvent', (chatData: any) => {
+          if (chatData?.content) {
+            const rawContent = (chatData.content || '').trim();
+            const extractedBadges: KickBadge[] =
+              chatData.sender?.identity?.badges ||
+              chatData.sender?.badges ||
+              [];
+
+            // Yayıncı veya Moderatör Yetki Kontrolü
+            const isAuthorized = extractedBadges.some(
+              (b) => {
+                const t = (b.type || '').toLowerCase();
+                return t === 'broadcaster' || t === 'moderator' || t === 'mod';
+              }
+            );
+
+            // !konum veya !location komutu
+            if (isAuthorized && (rawContent.startsWith('!konum ') || rawContent.startsWith('!location '))) {
+              const newLoc = rawContent.replace(/^!(konum|location)\s+/i, '').trim();
+              if (newLoc) {
+                setActiveLocationQuery(newLoc);
+              }
+            }
+
+            if (slug === 'kick-chat') {
+              const newMsg: ChatMessage = {
+                id: chatData.id || String(Date.now() + Math.random()),
+                sender: chatData.sender?.username || 'izleyici',
+                content: chatData.content,
+                color: chatData.sender?.identity?.color || '#53FC18',
+                badges: extractedBadges,
+              };
+              setMessages((prev) => [...prev.slice(-15), newMsg]);
+            }
+          }
+        });
+
         if (slug === 'kick-viewers') {
           chatroomInstance.bind('App\\Events\\LivestreamUpdated', (eventData: any) => {
             if (eventData?.livestream) {
@@ -396,26 +432,6 @@ function WidgetContent({ slug }: { slug: string }) {
           chatroomInstance.bind('App\\Events\\LivestreamEnded', () => {
             setIsLive(false);
             setViewers(0);
-          });
-        }
-
-        if (slug === 'kick-chat') {
-          chatroomInstance.bind('App\\Events\\ChatMessageEvent', (chatData: any) => {
-            if (chatData?.content) {
-              const extractedBadges: KickBadge[] =
-                chatData.sender?.identity?.badges ||
-                chatData.sender?.badges ||
-                [];
-
-              const newMsg: ChatMessage = {
-                id: chatData.id || String(Date.now() + Math.random()),
-                sender: chatData.sender?.username || 'izleyici',
-                content: chatData.content,
-                color: chatData.sender?.identity?.color || '#53FC18',
-                badges: extractedBadges,
-              };
-              setMessages((prev) => [...prev.slice(-15), newMsg]);
-            }
           });
         }
 
@@ -559,7 +575,7 @@ function WidgetContent({ slug }: { slug: string }) {
           </div>
         )}
 
-        {/* 5. Modüler IRL CANLI YAYIN HUD */}
+        {/* 5. Modüler IRL HUD */}
         {slug === 'irl-hud' && (
           <div className="inline-flex items-center gap-3.5 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl text-xs font-semibold">
             {showLive && (
