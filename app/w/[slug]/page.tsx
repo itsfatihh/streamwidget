@@ -31,6 +31,43 @@ interface SubscriberBadgeItem {
   [key: string]: any;
 }
 
+interface KickStreamEvent {
+  id: string;
+  type: 'follower' | 'subscriber' | 'gifted' | 'host';
+  username: string;
+  detail?: string;
+  time: string;
+}
+
+
+function extractNumber(val: any, fallback: number = 0): number {
+  if (typeof val === 'number') return val;
+  if (!val) return fallback;
+  const match = String(val).match(/\d+/);
+  return match ? parseInt(match[0], 10) : fallback;
+}
+
+function parseKickEmotes(text: string) {
+  return text;
+}
+
+function getWeatherIcon(condition?: string | number) {
+  if (condition === undefined || condition === null) return '☀️';
+  if (typeof condition === 'number') {
+    if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(condition)) return '🌧️';
+    if ([1, 2, 3, 45, 48].includes(condition)) return '☁️';
+    if ([71, 73, 75, 77, 85, 86].includes(condition)) return '❄️';
+    if ([95, 96, 99].includes(condition)) return '⛈️';
+    return '☀️';
+  }
+  const c = String(condition).toLowerCase();
+  if (c.includes('rain') || c.includes('yağmur')) return '🌧️';
+  if (c.includes('cloud') || c.includes('bulut')) return '☁️';
+  if (c.includes('snow') || c.includes('kar')) return '❄️';
+  if (c.includes('thunder') || c.includes('fırtına')) return '⛈️';
+  return '☀️';
+}
+
 interface ChatMessage {
   id: string;
   sender: string;
@@ -46,7 +83,9 @@ function KickOfficialBadge({
   badge: KickBadge;
   subBadges: SubscriberBadgeItem[];
 }) {
-  const directImgUrl = badge.badge_image?.url || badge.badge_image?.src || badge.url || badge.src;
+  const directImgUrl =
+    badge.badge_image?.url || badge.badge_image?.src || badge.url || badge.src;
+
   if (directImgUrl && typeof directImgUrl === 'string') {
     return (
       <img
@@ -68,7 +107,7 @@ function KickOfficialBadge({
     if (subBadges && subBadges.length > 0) {
       const sorted = [...subBadges].sort((a, b) => (Number(b.months) || 0) - (Number(a.months) || 0));
       const matched = sorted.find((b) => subMonths >= (Number(b.months) || 1)) || sorted[sorted.length - 1];
-      
+
       const badgeUrl =
         matched?.badge_image?.url ||
         matched?.badge_image?.src ||
@@ -80,134 +119,19 @@ function KickOfficialBadge({
         return (
           <img
             src={badgeUrl}
-            alt={`Abone ${subMonths} Ay`}
-            title={`Abone (${subMonths} Ay)`}
+            alt="subscriber badge"
             className="inline-block h-[18px] w-[18px] mr-1.5 align-middle select-none shrink-0 object-contain rounded-sm"
           />
         );
       }
     }
-
-    return (
-      <span
-        className="inline-flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-[3px] bg-[#53FC18]/20 border border-[#53FC18] text-[#53FC18] font-bold text-[10px] mr-1.5 align-middle select-none shrink-0"
-        title={`Abone (${subMonths} Ay)`}
-      >
-        ★
-      </span>
-    );
-  }
-
-  if (type === 'broadcaster' || type === 'streamer') {
-    return (
-      <span className="inline-flex items-center justify-center h-[18px] px-1.5 rounded-[3px] bg-[#53FC18] text-black font-extrabold text-[10px] uppercase mr-1.5 align-middle select-none shrink-0">
-        YAYINCI
-      </span>
-    );
-  }
-
-  if (type === 'moderator' || type === 'mod') {
-    return (
-      <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-[3px] bg-[#00E701] text-black mr-1.5 align-middle select-none shrink-0" title="Moderatör">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-          <path d="M19.707 9.293l-5-5a1 1 0 0 0-1.414 1.414L14.586 7H7a5 5 0 0 0-5 5v5a1 1 0 0 0 2 0v-5a3 3 0 0 1 3-3h7.586l-1.293 1.293a1 1 0 0 0 1.414 1.414l5-5a1 1 0 0 0 0-1.414z" />
-        </svg>
-      </span>
-    );
-  }
-
-  if (type === 'vip') {
-    return (
-      <span className="inline-flex items-center justify-center h-[18px] px-1.5 rounded-[3px] bg-[#A970FF] text-white font-extrabold text-[10px] uppercase mr-1.5 align-middle select-none shrink-0">
-        VIP
-      </span>
-    );
-  }
-
-  if (type === 'verified') {
-    return (
-      <span className="inline-flex items-center justify-center h-[18px] w-[18px] rounded-full bg-[#53FC18] text-black font-black text-[10px] mr-1.5 align-middle select-none shrink-0">
-        ✓
-      </span>
-    );
-  }
-
-  if (type === 'founder') {
-    return (
-      <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[3px] bg-[#FFB800] text-black font-black text-[10px] mr-1.5 align-middle select-none shrink-0">
-        1ST
-      </span>
-    );
-  }
-
-  if (type === 'og') {
-    return (
-      <span className="inline-flex items-center justify-center h-[18px] px-1 rounded-[3px] bg-[#00D2FF] text-black font-bold text-[10px] mr-1.5 align-middle select-none shrink-0">
-        OG
-      </span>
-    );
   }
 
   return null;
-}
-
-function parseKickEmotes(content: string) {
-  if (!content) return '';
-  const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_]+)\]/g;
-  const nodes = [];
-  let lastIndex = 0;
-  let match;
-
-  while ((match = emoteRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(content.substring(lastIndex, match.index));
-    }
-    const emoteId = match[1];
-    const emoteName = match[2];
-    nodes.push(
-      <img
-        key={`${emoteId}-${match.index}`}
-        src={`https://files.kick.com/emotes/${emoteId}/fullsize`}
-        alt={emoteName}
-        title={emoteName}
-        className="inline-block h-[22px] w-auto align-middle mx-1 my-[-4px] select-none object-contain"
-        loading="lazy"
-      />
-    );
-    lastIndex = emoteRegex.lastIndex;
-  }
-
-  if (lastIndex < content.length) {
-    nodes.push(content.substring(lastIndex));
-  }
-
-  return nodes.length > 0 ? nodes : content;
-}
-
-function extractNumber(val: any): number | null {
-  if (val === undefined || val === null) return null;
-  if (typeof val === 'number') return val;
-  if (typeof val === 'string') {
-    const clean = val.replace(/,/g, '').trim();
-    const num = parseInt(clean, 10);
-    return isNaN(num) ? null : num;
-  }
-  return null;
-}
-
-function getWeatherIcon(code: number) {
-  if (code === 0) return '☀️';
-  if (code === 1 || code === 2) return '🌤️';
-  if (code === 3) return '☁️';
-  if (code >= 45 && code <= 48) return '🌫️';
-  if (code >= 51 && code <= 67) return '🌧️';
-  if (code >= 71 && code <= 77) return '❄️';
-  if (code >= 80 && code <= 82) return '🌦️';
-  if (code >= 95 && code <= 99) return '⛈️';
-  return '🌡️';
 }
 
 function WidgetContent({ slug }: { slug: string }) {
+  const [streamEvents, setStreamEvents] = useState<KickStreamEvent[]>([]);
   
   const searchParams = useSearchParams();
   const channel = searchParams.get('channel') || 'itsfatih';
@@ -685,14 +609,28 @@ function WidgetContent({ slug }: { slug: string }) {
             </div>
             
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between bg-black/75 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-white/5 text-xs text-white">
-                <span className="text-neutral-400">Son Takip</span>
-                <span className="font-bold font-mono" style={{ color: accent || '#53FC18' }}>ahmet_kaya</span>
-              </div>
-              <div className="flex items-center justify-between bg-black/75 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-white/5 text-xs text-white">
-                <span className="text-neutral-400">Son Abone</span>
-                <span className="font-bold font-mono text-purple-400">can_demir</span>
-              </div>
+              {streamEvents.length === 0 ? (
+                <div className="bg-black/60 backdrop-blur-sm px-3.5 py-2.5 rounded-xl border border-white/5 text-xs text-slate-400 font-mono text-center">
+                  Olay bekleniyor...
+                </div>
+              ) : (
+                streamEvents.slice(0, Number(searchParams.get('limit') || 3)).map((ev) => (
+                  <div key={ev.id} className="flex items-center justify-between bg-black/75 backdrop-blur-sm px-3.5 py-2 rounded-xl border border-white/5 text-xs text-white animate-in fade-in slide-in-from-bottom-1 duration-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs">
+                        {ev.type === 'follower' && '👤'}
+                        {ev.type === 'subscriber' && '⭐'}
+                        {ev.type === 'gifted' && '🎁'}
+                        {ev.type === 'host' && '📢'}
+                      </span>
+                      <span className="font-bold font-mono text-neutral-200">{ev.username}</span>
+                    </div>
+                    <span className="text-[11px] font-mono font-semibold" style={{ color: ev.type === 'subscriber' ? '#c084fc' : accent || '#53FC18' }}>
+                      {ev.detail}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
