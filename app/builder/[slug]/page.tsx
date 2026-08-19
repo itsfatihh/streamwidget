@@ -4,6 +4,18 @@ import { useState, useEffect, use } from "react";
 import { WIDGETS_LIST } from "@/lib/widgets";
 import Link from "next/link";
 
+function getWeatherIcon(code: number) {
+  if (code === 0) return '☀️';
+  if (code === 1 || code === 2) return '🌤️';
+  if (code === 3) return '☁️';
+  if (code >= 45 && code <= 48) return '🌫️';
+  if (code >= 51 && code <= 67) return '🌧️';
+  if (code >= 71 && code <= 77) return '❄️';
+  if (code >= 80 && code <= 82) return '🌦️';
+  if (code >= 95 && code <= 99) return '⛈️';
+  return '🌡️';
+}
+
 export default function BuilderPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const widget = WIDGETS_LIST.find((w) => w.id === slug);
@@ -19,7 +31,12 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
   const [copied, setCopied] = useState(false);
   const [currentTime, setCurrentTime] = useState("22:15:37");
 
-  // Canlı Önizleme Saati
+  // Otomatik Kullanıcı Konumu & Canlı Hava Durumu (Önizleme İçin)
+  const [autoCity, setAutoCity] = useState<string>("Konum aranıyor...");
+  const [autoTemp, setAutoTemp] = useState<string>("25°C");
+  const [weatherCode, setWeatherCode] = useState<number>(0);
+
+  // 1. Canlı Önizleme Saati
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
@@ -34,6 +51,65 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
     }, 1000);
     return () => clearInterval(timer);
   }, [formState.format]);
+
+  // 2. Kullanıcının Gerçek Şehrini ve Canlı Sıcaklığını Çek
+  useEffect(() => {
+    if (slug !== "irl-hud") return;
+
+    const fetchClientLocation = async () => {
+      try {
+        let lat: number | null = null;
+        let lon: number | null = null;
+        let city = "";
+
+        // Eğer kullanıcı formda elle özel bir şehir yazmadıysa (veya auto ise) gerçek konumunu bul
+        if (!formState.location || formState.location.toLowerCase() === "auto") {
+          const ipRes = await fetch("https://ipwho.is/");
+          if (ipRes.ok) {
+            const ipData = await ipRes.json();
+            if (ipData?.success) {
+              city = ipData.city || ipData.region || "Canlı Konum";
+              lat = ipData.latitude;
+              lon = ipData.longitude;
+              setAutoCity(city);
+            }
+          }
+        } else {
+          city = formState.location;
+          setAutoCity(city);
+          const geoRes = await fetch(
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=tr&format=json`
+          );
+          if (geoRes.ok) {
+            const geoData = await geoRes.json();
+            if (geoData?.results?.[0]) {
+              lat = geoData.results[0].latitude;
+              lon = geoData.results[0].longitude;
+            }
+          }
+        }
+
+        // Sıcaklık ve hava ikonu
+        if (lat !== null && lon !== null) {
+          const wRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`
+          );
+          if (wRes.ok) {
+            const wData = await wRes.json();
+            if (wData?.current) {
+              setAutoTemp(`${Math.round(wData.current.temperature_2m)}°C`);
+              setWeatherCode(wData.current.weather_code);
+            }
+          }
+        }
+      } catch {
+        setAutoCity("Canlı Konum");
+        setAutoTemp("25°C");
+      }
+    };
+
+    fetchClientLocation();
+  }, [slug, formState.location]);
 
   if (!widget) {
     return (
@@ -61,12 +137,6 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
 
   const scale = Number(formState.scale || 100) / 100;
   const accent = formState.accent || (slug === "sub-goal" ? "#A970FF" : "#53FC18");
-
-  // IRL HUD Önizleme Konumu
-  const previewLocation =
-    formState.location && formState.location.toLowerCase() !== "auto"
-      ? formState.location
-      : "Palavas-les-Flots";
 
   return (
     <div className="min-h-screen bg-[#090b10] text-slate-100 font-sans relative pb-16">
@@ -235,7 +305,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                             )}
                             <span className="flex items-center gap-1.5 text-slate-300 font-medium">
                               <span className="text-emerald-400 text-sm">📍</span>
-                              <span>{previewLocation}</span>
+                              <span>{autoCity}</span>
                             </span>
                           </>
                         )}
@@ -246,8 +316,8 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                               <div className="h-4 w-[1px] bg-white/20" />
                             )}
                             <span className="flex items-center gap-1.5 text-amber-300 font-mono font-bold">
-                              <span>☀️</span>
-                              <span>25°C</span>
+                              <span>{getWeatherIcon(weatherCode)}</span>
+                              <span>{autoTemp}</span>
                             </span>
                           </>
                         )}
@@ -273,7 +343,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
               </div>
 
               <div className="mt-6 p-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-400 flex items-center justify-between">
-                <span>💡 Soldaki ayarlarla oynadıkça önizleme anlık olarak güncellenir.</span>
+                <span>💡 Önizleme kutusunda o an bulunduğun şehir ve hava durumu canlı olarak gösterilir.</span>
               </div>
             </div>
           </div>
