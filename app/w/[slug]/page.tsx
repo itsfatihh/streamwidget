@@ -295,48 +295,41 @@ function WidgetContent({ slug }: { slug: string }) {
     if (!channel) return null;
     const cleanChannel = channel.toLowerCase().trim();
 
+    let chatroomId: any = null;
+
+    // 1. Kendi Next.js API rotamızdan çek (CORS engeli yok)
     try {
-      const res = await fetch(`https://kick.com/api/v1/channels/${cleanChannel}?_t=${Date.now()}`);
+      const res = await fetch(`/api/kick?channel=${encodeURIComponent(cleanChannel)}&_t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
-        
-        if (data?.subscriber_badges && Array.isArray(data.subscriber_badges)) {
-          setSubBadges(data.subscriber_badges);
+
+        if (data?.chatroomId) {
+          chatroomId = data.chatroomId;
         }
 
-        const fCount =
-          extractNumber(data?.followersCount) ??
-          extractNumber(data?.followers_count) ??
-          extractNumber(data?.followers) ??
-          extractNumber(data?.user?.followers_count) ??
-          null;
+        if (data?.subscriberBadges && Array.isArray(data.subscriberBadges)) {
+          setSubBadges(data.subscriberBadges);
+        }
 
-        if (fCount !== null) setFollowerCount(fCount);
-
-        if (!currentParam) {
-          const sCount =
-            extractNumber(data?.subscribers_count) ??
-            extractNumber(data?.subscribersCount) ??
-            extractNumber(data?.subscriber_count) ??
-            null;
-          if (sCount !== null && sCount > 0) setSubCount(sCount);
+        if (data?.followersCount !== undefined && data.followersCount !== null) {
+          setFollowerCount(Number(data.followersCount));
         }
 
         if (data?.livestream) {
           setIsLive(true);
-          setViewers(data.livestream.viewer_count || 0);
+          setViewers(Number(data.livestream.viewer_count || data.livestream.viewers || 0));
         } else {
           setIsLive(false);
           setViewers(0);
         }
 
-        if (data?.chatroom?.id) return { chatroomId: data.chatroom.id };
+        return { ...data, chatroomId };
       }
-
-      return null;
-    } catch {
-      return null;
+    } catch (e) {
+      console.warn('API route kick fetch failed:', e);
     }
+
+    return { chatroomId };
   }, [channel, currentParam]);
 
   // 5. Pusher WebSocket (!konum komutu)
