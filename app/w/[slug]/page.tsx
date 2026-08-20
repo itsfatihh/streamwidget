@@ -140,7 +140,8 @@ function KickOfficialBadge({
   return null;
 }
 
-function WidgetContent({ slug }: { slug: string }) {
+function WidgetContent({ slug: rawSlug }: { slug: string }) {
+  const slug = normalizeSlug(rawSlug);
   const [streamEvents, setStreamEvents] = useState<KickStreamEvent[]>([
     { id: '1', type: 'follower', username: 'Hazır (Canlı Bekleniyor)', detail: 'Takipçi', time: 'Şimdi' }
   ]);
