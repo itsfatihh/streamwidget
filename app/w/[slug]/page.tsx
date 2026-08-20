@@ -1,4 +1,14 @@
 'use client';
+
+function normalizeSlug(s: string) {
+  const clean = s.toLowerCase().trim();
+  if (["chat-box", "chat", "kick-chat", "kick-chat-box"].includes(clean)) return "kick-chat";
+  if (["viewer-count", "viewers", "kick-viewers", "kick-viewer-count", "live-viewers"].includes(clean)) return "kick-viewers";
+  if (["follower-goal", "followers-goal"].includes(clean)) return "follower-goal";
+  if (["sub-goal", "subs-goal"].includes(clean)) return "sub-goal";
+  return clean;
+}
+
 import { WIDGETS_LIST } from "@/lib/widgets";
 
 
@@ -648,7 +658,8 @@ function WidgetContent({ slug }: { slug: string }) {
 }
 
 export default function DynamicWidgetPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
+  const { slug: rawSlug } = use(params);
+  const slug = normalizeSlug(rawSlug);
   return (
     <Suspense fallback={<div className="bg-transparent min-h-screen" />}>
       <WidgetContent slug={slug} />
