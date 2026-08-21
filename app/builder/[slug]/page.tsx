@@ -1,234 +1,167 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { WIDGETS_LIST } from '@/lib/widgets';
-import { LangCode } from '@/lib/i18n';
+import { WIDGETS_LIST, WidgetDef } from '@/lib/widgets';
+import { LangCode, UI_TEXTS } from '@/lib/i18n';
+import HeaderControls from '@/components/HeaderControls';
 
 export default function BuilderPage({ params }: { params: Promise<{ slug: string }> }) {
-  const resolvedParams = use(params);
-  const lang: LangCode = 'tr';
-  const slug = resolvedParams.slug;
-
-  const widget = WIDGETS_LIST.find((w) => w.id === slug) || WIDGETS_LIST[0];
-
-  const [formState, setFormState] = useState<Record<string, any>>(() => {
-    const initial: Record<string, any> = {};
-    widget.fields.forEach((f) => {
-      initial[f.name] = f.defaultValue !== undefined ? f.defaultValue : '';
-    });
-    return initial;
-  });
-
+  const { slug } = use(params);
+  const [lang, setLang] = useState<LangCode>('en');
   const [copied, setCopied] = useState(false);
+  const [origin, setOrigin] = useState('');
 
-  const handleFieldChange = (name: string, value: any) => {
-    setFormState((prev) => ({ ...prev, [name]: value }));
-  };
+  const widgetDef: WidgetDef | undefined = WIDGETS_LIST.find((w) => w.id === slug);
 
-  const currentChannel = formState.channel || 'itsfatih';
-
-  // OBS Bağlantı URL'i
-  const queryParams = new URLSearchParams();
-  Object.entries(formState).forEach(([key, val]) => {
-    if (val !== undefined && val !== '') {
-      queryParams.set(key, String(val));
+  const [formValues, setFormValues] = useState<Record<string, any>>(() => {
+    const defaults: Record<string, any> = {};
+    if (widgetDef) {
+      widgetDef.fields.forEach((f) => {
+        defaults[f.name] = f.defaultValue ?? '';
+      });
     }
+    return defaults;
   });
 
-  const obsUrl = `https://www.streamwidget.live/w/${widget.id}?${queryParams.toString()}`;
-  const gpsTransmitterUrl = `/gps?session=${encodeURIComponent(currentChannel)}`;
+  useEffect(() => {
+    const savedLang = (localStorage.getItem('sw_lang') as LangCode) || 'en';
+    setLang(savedLang);
+    setOrigin(window.location.origin);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(obsUrl);
+    const onLangChange = () => {
+      const updated = (localStorage.getItem('sw_lang') as LangCode) || 'en';
+      setLang(updated);
+    };
+    window.addEventListener('sw_lang_changed', onLangChange);
+    return () => window.removeEventListener('sw_lang_changed', onLangChange);
+  }, []);
+
+  if (!widgetDef) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-[#07090e] text-zinc-900 dark:text-white flex items-center justify-center">
+        Widget Not Found
+      </div>
+    );
+  }
+
+  const t = UI_TEXTS[lang] || UI_TEXTS.en;
+
+  const queryString = new URLSearchParams(
+    Object.entries(formValues).reduce((acc, [k, v]) => {
+      if (v !== undefined && v !== '') acc[k] = String(v);
+      return acc;
+    }, {} as Record<string, string>)
+  ).toString();
+
+  const previewUrl = `/w/${widgetDef.id}${queryString ? `?${queryString}` : ''}`;
+  const fullObsUrl = `${origin}${previewUrl}`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(fullObsUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans select-none">
-      {/* Üst Navigasyon */}
-      <header className="border-b border-white/10 px-8 py-4 flex items-center justify-between">
-        <Link href="/" className="text-xs font-bold text-white/60 hover:text-white flex items-center gap-2">
-          ← Widget Kataloğu
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#07090e] text-zinc-900 dark:text-white flex flex-col font-sans select-none transition-colors duration-300">
+      {/* Header */}
+      <header className="border-b border-black/10 dark:border-white/10 px-8 py-5 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-black tracking-widest text-sm">STREAMWIDGET</span>
         </Link>
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-black tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full">
-            {widget.name[lang] || widget.name['tr']}
-          </span>
-        </div>
+        <HeaderControls lang={lang} onLangChange={setLang} />
       </header>
 
-      {/* Ana Başlık */}
-      <div className="max-w-6xl w-full mx-auto px-8 pt-8 pb-4">
-        <h1 className="text-3xl font-black tracking-tight text-white">{widget.name[lang] || widget.name['tr']}</h1>
-        <p className="text-sm text-white/50 mt-1">{widget.description[lang] || widget.description['tr']}</p>
-      </div>
-
-      {/* Ana Çalışma Alanı */}
-      <main className="max-w-6xl w-full mx-auto px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
+      {/* Main Builder */}
+      <main className="max-w-6xl w-full mx-auto px-6 py-10 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Sol Panel: Ayarlar */}
-        <div className="lg:col-span-5 space-y-6">
-          <div className="bg-[#0b0e14] border border-white/10 rounded-3xl p-6 space-y-5">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              <h2 className="text-xs font-bold uppercase tracking-wider text-white/80">AYARLAR</h2>
+        <div className="lg:col-span-5 bg-white dark:bg-[#0b0e14] border border-black/10 dark:border-white/10 rounded-3xl p-6 flex flex-col justify-between shadow-sm dark:shadow-none space-y-6">
+          <div className="space-y-6">
+            <div className="space-y-1">
+              <Link href="/" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
+                ← {t.backToHome}
+              </Link>
+              <h2 className="text-xl font-black">{widgetDef.name[lang] || widgetDef.name.en}</h2>
+              <p className="text-xs text-zinc-500 dark:text-white/50">{widgetDef.description[lang] || widgetDef.description.en}</p>
             </div>
 
-            {/* Dinamik Form Alanları */}
-            <div className="space-y-4">
-              {widget.fields.map((field) => (
+            {/* Form Alanları */}
+            <div className="space-y-4 pt-2">
+              {widgetDef.fields.map((field) => (
                 <div key={field.name} className="space-y-1.5">
-                  <label className="text-xs font-bold text-white/60">
-                    {field.label[lang] || field.label['tr']}
+                  <label className="text-xs font-bold text-zinc-700 dark:text-white/70">
+                    {field.label[lang] || field.label.en}
                   </label>
-
-                  {field.type === 'text' && (
-                    <input
-                      type="text"
-                      value={formState[field.name] || ''}
-                      onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                      placeholder={field.placeholder}
-                      className="w-full bg-[#07090e] border border-white/15 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-emerald-400"
-                    />
-                  )}
-
-                  {field.type === 'select' && (
+                  {field.type === 'select' ? (
                     <select
-                      value={formState[field.name] || ''}
-                      onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                      className="w-full bg-[#07090e] border border-white/15 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-emerald-400"
+                      value={formValues[field.name]}
+                      onChange={(e) => setFormValues({ ...formValues, [field.name]: e.target.value })}
+                      className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500"
                     >
                       {field.options?.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label[lang] || opt.label['tr']}
+                        <option key={opt.value} value={opt.value} className="bg-zinc-900 text-white">
+                          {opt.label[lang] || opt.label.en}
                         </option>
                       ))}
                     </select>
-                  )}
-
-                  {field.type === 'color' && (
-                    <div className="flex items-center gap-3 bg-[#07090e] border border-white/15 rounded-xl p-2">
+                  ) : field.type === 'color' ? (
+                    <div className="flex items-center gap-3">
                       <input
                         type="color"
-                        value={formState[field.name] || '#53FC18'}
-                        onChange={(e) => handleFieldChange(field.name, e.target.value)}
-                        className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
+                        value={formValues[field.name]}
+                        onChange={(e) => setFormValues({ ...formValues, [field.name]: e.target.value })}
+                        className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0"
                       />
-                      <span className="text-xs font-mono font-bold text-white/80 uppercase">
-                        {formState[field.name] || '#53FC18'}
-                      </span>
+                      <span className="text-xs font-mono text-zinc-500 dark:text-white/50">{formValues[field.name]}</span>
                     </div>
+                  ) : (
+                    <input
+                      type={field.type}
+                      value={formValues[field.name]}
+                      placeholder={field.placeholder}
+                      onChange={(e) => setFormValues({ ...formValues, [field.name]: e.target.value })}
+                      className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500"
+                    />
                   )}
                 </div>
               ))}
             </div>
-
-            {/* GPS Mini-Map İçin Özel Session Başlatma Buton Alanı */}
-            {widget.id === 'mini-map' && (
-              <div className="pt-3 border-t border-white/10 space-y-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-emerald-400">Canlı GPS Vericisi</span>
-                  <span className="text-white/40 text-[11px]">Mobil & Web</span>
-                </div>
-                <a
-                  href={gpsTransmitterUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="w-full py-3.5 px-4 rounded-xl bg-emerald-500 text-black font-black text-xs uppercase tracking-wider hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 text-center"
-                >
-                  📍 KONUM BAŞLATICI SAYFASINA GİT ↗
-                </a>
-              </div>
-            )}
           </div>
 
-          {/* OBS Bağlantı Kutusu */}
-          <div className="bg-[#0b0e14] border border-white/10 rounded-3xl p-6 space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">OBS BROWSER BAĞLANTISI</h3>
-            <div className="bg-[#07090e] border border-white/10 rounded-xl p-3 text-xs font-mono text-emerald-400 break-all select-all">
-              {obsUrl}
+          {/* OBS URL & Kopyalama */}
+          <div className="pt-6 border-t border-black/5 dark:border-white/5 space-y-2">
+            <span className="text-[11px] font-bold text-zinc-500 dark:text-white/40 uppercase tracking-wider">
+              {t.obsUrl}
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={fullObsUrl}
+                className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-zinc-600 dark:text-white/60 select-all outline-none"
+              />
+              <button
+                onClick={copyToClipboard}
+                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl transition-all whitespace-nowrap"
+              >
+                {copied ? t.copied : t.copyUrl}
+              </button>
             </div>
-            <button
-              onClick={handleCopy}
-              className={`w-full py-3.5 rounded-xl font-black text-sm tracking-wide transition-all ${
-                copied
-                  ? 'bg-white text-black'
-                  : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-lg shadow-emerald-500/20'
-              }`}
-            >
-              {copied ? '✓ KOPYALANDI!' : 'OBS Linkini Kopyala'}
-            </button>
           </div>
         </div>
 
         {/* Sağ Panel: Canlı Önizleme */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="bg-[#0b0e14] border border-white/10 rounded-3xl p-6 min-h-[440px] flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-white/60">CANLI ÖNİZLEME</span>
-              <span className="text-xs font-mono text-white/40">Live Simulator</span>
-            </div>
-
-            {/* Radar Mini-Map Canlı Önizleme */}
-            <div className="flex-1 flex items-center justify-center py-6">
-              {widget.id === 'mini-map' ? (
-                <div
-                  className={`relative ${
-                    formState.shape === 'square' ? 'w-64 h-64 rounded-3xl' : 'w-64 h-64 rounded-full'
-                  } border-[3px] shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300`}
-                  style={{
-                    borderColor: formState.accent || '#53FC18',
-                    backgroundColor: '#090b10',
-                    boxShadow: `0 0 35px ${formState.accent || '#53FC18'}40`,
-                  }}
-                >
-                  <div
-                    className="absolute inset-0 bg-cover bg-center opacity-70"
-                    style={{
-                      backgroundImage: `url('https://a.basemaps.cartocdn.com/dark_all/16/33947/23019.png')`,
-                      transform: 'scale(1.3)',
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-[radial-gradient(#ffffff15_1px,transparent_1px)] [background-size:14px_14px]" />
-                  <div className="absolute inset-0 rounded-full border border-dashed border-white/20" />
-
-                  {/* Oyuncu Oku */}
-                  <div className="relative flex flex-col items-center">
-                    <div
-                      className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[18px]"
-                      style={{
-                        borderBottomColor: formState.accent || '#53FC18',
-                        filter: `drop-shadow(0 0 8px ${formState.accent || '#53FC18'})`,
-                      }}
-                    />
-                    <div className="w-2.5 h-2.5 rounded-full bg-white -mt-1 shadow-md border border-black" />
-                  </div>
-
-                  {/* Hız */}
-                  <div className="absolute bottom-3 bg-black/90 backdrop-blur-md px-3 py-1 rounded-xl border border-white/20 flex items-baseline gap-1 shadow-lg">
-                    <span className="text-sm font-black font-mono text-white">0</span>
-                    <span className="text-[9px] font-bold text-white/50">KM/H</span>
-                  </div>
-
-                  {/* Durum */}
-                  <div className="absolute top-3 bg-black/80 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-white/15 flex items-center gap-1.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-[9px] font-black text-white/90 uppercase tracking-wider">RADAR LIVE</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs font-mono text-white/30 uppercase">Önizleme Alanı</div>
-              )}
-            </div>
-
-            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-white/40 flex items-center gap-2">
-              💡 Soldaki ayarlarla oynadıkça önizleme ve bağlantı linki anlık olarak güncellenir.
-            </div>
+        <div className="lg:col-span-7 bg-zinc-900 border border-black/10 dark:border-white/10 rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden min-h-[420px]">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4 z-10">
+            <span className="text-xs font-bold text-white/50 uppercase tracking-widest">{t.livePreview}</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+          </div>
+          <div className="flex-1 w-full h-full relative rounded-2xl overflow-hidden bg-black/40 border border-white/5 flex items-center justify-center">
+            <iframe src={previewUrl} className="w-full h-full border-0 absolute inset-0 pointer-events-none" />
           </div>
         </div>
-
       </main>
     </div>
   );
