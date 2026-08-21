@@ -240,18 +240,18 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
 
   const playPingSound = () => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
       osc.connect(gain);
-      gain.connect(audioCtx.destination);
+      gain.connect(ctx.destination);
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.35);
+      osc.stop(ctx.currentTime + 0.3);
     } catch (e) {}
   };
 
@@ -259,28 +259,28 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     let ws: WebSocket | null = null;
     let pollInterval: any = null;
 
-    // 1. Kick Chatroom ID ve Mevcut Pinli Mesajı Al
-    const initPinned = async () => {
+    const connect = async () => {
       try {
-        const res = await fetch(`https://kick.com/api/v2/channels/${channel}/chatroom`);
+        const res = await fetch(`/api/kick/pinned?channel=${encodeURIComponent(channel)}`);
         if (!res.ok) return;
         const data = await res.json();
-        
+
         if (data.pinned_message) {
+          const pm = data.pinned_message;
           setPinned({
-            id: String(data.pinned_message.id || Date.now()),
-            username: data.pinned_message.sender?.username || data.pinned_message.user?.username || 'Moderatör',
-            content: data.pinned_message.content || data.pinned_message.message || '',
-            color: data.pinned_message.sender?.identity?.color || accent,
+            id: String(pm.id || Date.now()),
+            username: pm.sender?.username || pm.user?.username || 'Moderatör',
+            content: pm.content || pm.message || '',
+            color: pm.sender?.identity?.color || accent,
           });
         }
 
-        const chatroomId = data.id;
+        const chatroomId = data.chatroom_id;
         if (!chatroomId) return;
 
-        // 2. Pusher Canlı Soket Bağlantısı
+        // Pusher soket bağlantısı
         ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
-        
+
         ws.onopen = () => {
           ws?.send(JSON.stringify({
             event: 'pusher:subscribe',
@@ -293,14 +293,9 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
             const parsed = JSON.parse(event.data);
             const ev = parsed.event || '';
 
-            if (ev.includes('Pinned') || ev.includes('pinned')) {
-              if (ev.includes('Unpin') || ev.includes('unpin')) {
-                setPinned(null);
-                return;
-              }
+            if (ev.includes('ChatMessagePinned') || ev.includes('pinned')) {
               const payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
               const msg = payload.message || payload.pinned_message || payload;
-              
               setPinned({
                 id: String(msg.id || Date.now()),
                 username: msg.sender?.username || msg.user?.username || 'Moderatör',
@@ -308,40 +303,43 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
                 color: msg.sender?.identity?.color || accent,
               });
               playPingSound();
+            } else if (ev.includes('ChatMessageUnpinned') || ev.includes('unpinned')) {
+              setPinned(null);
             }
-          } catch (err) {}
+          } catch (e) {}
         };
       } catch (e) {}
     };
 
-    initPinned();
+    connect();
 
-    // 3. Fallback: Her 5 saniyede bir API kontrolü (Soket kaçırırsa devreye girer)
+    // Polling yedek kontrolü (her 4 saniyede bir)
     pollInterval = setInterval(async () => {
       try {
-        const res = await fetch(`https://kick.com/api/v2/channels/${channel}/chatroom`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!data.pinned_message) {
-            setPinned((prev) => (prev ? null : prev));
-          } else {
-            const pId = String(data.pinned_message.id);
-            setPinned((prev) => {
-              if (!prev || prev.id !== pId) {
-                playPingSound();
-                return {
-                  id: pId,
-                  username: data.pinned_message.sender?.username || data.pinned_message.user?.username || 'Moderatör',
-                  content: data.pinned_message.content || data.pinned_message.message || '',
-                  color: data.pinned_message.sender?.identity?.color || accent,
-                };
-              }
-              return prev;
-            });
-          }
+        const res = await fetch(`/api/kick/pinned?channel=${encodeURIComponent(channel)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (!data.pinned_message) {
+          setPinned((prev) => (prev ? null : null));
+        } else {
+          const pm = data.pinned_message;
+          const pId = String(pm.id);
+          setPinned((prev) => {
+            if (!prev || prev.id !== pId) {
+              playPingSound();
+              return {
+                id: pId,
+                username: pm.sender?.username || pm.user?.username || 'Moderatör',
+                content: pm.content || pm.message || '',
+                color: pm.sender?.identity?.color || accent,
+              };
+            }
+            return prev;
+          });
         }
       } catch (e) {}
-    }, 5000);
+    }, 4000);
 
     return () => {
       if (ws) ws.close();
