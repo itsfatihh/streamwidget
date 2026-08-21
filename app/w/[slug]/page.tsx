@@ -225,6 +225,124 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
   );
 }
 
+
+function KickPinnedWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
+  const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
+  const position = searchParams.position || 'top-left';
+  const accent = searchParams.accent || '#53FC18';
+
+  const [pinned, setPinned] = useState<{
+    id: string;
+    username: string;
+    content: string;
+    color?: string;
+  } | null>({
+    id: 'demo-1',
+    username: 'Moderatör',
+    content: '🎉 Yayına hoş geldiniz! Çekiliş için chate !katil yazabilirsiniz.',
+    color: accent,
+  });
+
+  const playPingSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.35);
+    } catch (e) {}
+  };
+
+  // Kick WebSocket / API Dinleyicisi
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let timer: any = null;
+
+    const connectPusher = async () => {
+      try {
+        const res = await fetch(`https://kick.com/api/v2/channels/${channel}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const chatroomId = data.chatroom?.id;
+        if (!chatroomId) return;
+
+        ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
+        
+        ws.onopen = () => {
+          ws?.send(JSON.stringify({
+            event: 'pusher:subscribe',
+            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
+          }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed.event === 'App\\Events\\ChatMessagePinnedEvent' || parsed.event === 'ChatMessagePinned') {
+              const msgData = JSON.parse(parsed.data);
+              setPinned({
+                id: msgData.message?.id || Date.now().toString(),
+                username: msgData.message?.sender?.username || 'KickChat',
+                content: msgData.message?.content || '',
+                color: msgData.message?.sender?.identity?.color || accent,
+              });
+              playPingSound();
+            } else if (parsed.event === 'App\\Events\\ChatMessageUnpinnedEvent' || parsed.event === 'ChatMessageUnpinned') {
+              setPinned(null);
+            }
+          } catch (err) {}
+        };
+      } catch (e) {}
+    };
+
+    connectPusher();
+    return () => {
+      if (ws) ws.close();
+      if (timer) clearInterval(timer);
+    };
+  }, [channel]);
+
+  if (!pinned) return <div className="w-screen h-screen bg-transparent" />;
+
+  const posClass =
+    position === 'top-right'
+      ? 'items-start justify-end p-8'
+      : position === 'bottom-center'
+      ? 'items-end justify-center p-8'
+      : 'items-start justify-start p-8';
+
+  return (
+    <div className={`w-screen h-screen flex ${posClass} bg-transparent select-none animate-in fade-in zoom-in-95 duration-300`}>
+      <div
+        className="max-w-md bg-[#0a0d14]/90 backdrop-blur-xl border border-white/15 rounded-2xl p-4 shadow-2xl relative overflow-hidden"
+        style={{ borderLeft: `4px solid ${accent}`, boxShadow: `0 10px 30px ${accent}25` }}
+      >
+        <div className="flex items-center justify-between gap-3 mb-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📌</span>
+            <span className="text-xs font-black tracking-wider uppercase" style={{ color: pinned.color || accent }}>
+              {pinned.username}
+            </span>
+          </div>
+          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-md">
+            SABİTLENDİ
+          </span>
+        </div>
+        <p className="text-sm text-white/90 font-medium leading-snug break-words pl-5">
+          {pinned.content}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function WidgetPage({
   params,
   searchParams,
@@ -238,6 +356,9 @@ export default function WidgetPage({
 
   if (['mini-map', 'radar', 'radar-hud', 'map', 'nfs-mini-map'].includes(rawSlug)) {
     return <MiniMapWidget searchParams={resolvedSearchParams} />;
+  }
+  if (['kick-pinned', 'pinned-message', 'pinned', 'pin'].includes(rawSlug)) {
+    return <KickPinnedWidget searchParams={resolvedSearchParams} />;
   }
   if (['kick-chat', 'chat-box', 'chat'].includes(rawSlug)) {
     return <KickChatWidget searchParams={resolvedSearchParams} />;
