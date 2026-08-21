@@ -11,99 +11,99 @@ export default function Home() {
       badge: "Yayınlarınızı Üst Seviyeye Taşıyın",
       desc: "OBS, Streamlabs ve Kick için modern, şeffaf ve gerçek zamanlı canlı yayın widget katmanları.",
       btn: "Özelleştirici →",
-      widgets: [
-        {
-          id: "viewer-count",
-          title: "Kick Canlı İzleyici",
-          desc: "Kick kanalınızın anlık izleyici sayısını gösteren şeffaf neon rozet.",
-          href: "/builder/viewer-count",
-        },
-        {
-          id: "chat-box",
-          title: "Kick Canlı Sohbet (Chat Box)",
-          desc: "OBS için ultra hafif, resmi Kick rozetleri ve ifadeleriyle canlı sohbet.",
-          href: "/builder/chat-box",
-        },
-        {
-          id: "follower-goal",
-          title: "Takipçi Hedefi (Follower Goal)",
-          desc: "Kick takipçi sayısını otomatik çeken ve yeni takip geldikçe canlı ilerleyen çubuk.",
-          href: "/builder/follower-goal",
-        },
-        {
-          id: "sub-goal",
-          title: "Abone Hedefi (Sub Goal)",
-          desc: "Kick yeni abonelik ve hediye aboneliklerde canlı ilerleyen hedef çubuğu.",
-          href: "/builder/sub-goal",
-        },
-        {
-          id: "irl-hud",
-          title: "IRL Canlı Yayın HUD",
-          desc: "Dış mekan yayınları için modüler LIVE rozeti, saat, konum, hava durumu ve canlı pil durumu.",
-          href: "/builder/irl-hud",
-        },
-  {
-    id: "mini-map",
-    name: "NFS Mini-Map Radar",
-    category: "IRL & Harita",
-    description: "GTA/NFS tarzı karanlık temalı radar mini haritası, hız kadranı ve canlı GPS takibi.",
-    icon: "Navigation",
-    badge: "YENİ",
-    bgGradient: "from-emerald-500/20 to-teal-500/20",
-    borderColor: "group-hover:border-emerald-500/50",
-  },
-        {
-          id: "clock",
-          title: "Minimal Dijital Saat",
-          desc: "Şık ve cam efektli ekran üzeri dijital saat katmanı.",
-          href: "/builder/clock",
-        },
-        
-      ],
+          widgets: [
+      {
+        id: "viewer-count",
+        title: "Kick Canlı İzleyici",
+        desc: "Kick kanalınızın anlık izleyici sayısını gösteren şeffaf neon rozet.",
+        href: "/builder/viewer-count",
+      },
+      {
+        id: "chat-box",
+        title: "Kick Canlı Sohbet (Chat Box)",
+        desc: "OBS için ultra hafif, resmi Kick rozetleri ve ifadeleriyle canlı sohbet.",
+        href: "/builder/chat-box",
+      },
+      {
+        id: "follower-goal",
+        title: "Takipçi Hedefi (Follower Goal)",
+        desc: "Kick takipçi sayısını otomatik çeken ve yeni takip geldikçe canlı ilerleyen çubuk.",
+        href: "/builder/follower-goal",
+      },
+      {
+        id: "sub-goal",
+        title: "Abone Hedefi (Sub Goal)",
+        desc: "Kick yeni abonelik ve hediye aboneliklerde canlı ilerleyen hedef çubuğu.",
+        href: "/builder/sub-goal",
+      },
+      {
+        id: "irl-hud",
+        title: "IRL Canlı Yayın HUD",
+        desc: "Dış mekan yayınları için modüler LIVE rozeti, saat, konum, hava durumu ve canlı pil durumu.",
+        href: "/builder/irl-hud",
+      },
+      {
+        id: "mini-map",
+        title: "NFS Mini-Map Radar",
+        desc: "GTA/NFS tarzı canlı radar haritası, hız kadranı ve telefondan anlık GPS takibi.",
+        href: "/builder/mini-map",
+      },
+      {
+        id: "clock",
+        title: "Minimal Dijital Saat",
+        desc: "Şık ve cam efektli ekran üzeri dijital saat katmanı.",
+        href: "/builder/clock",
+      },
+    ],
     },
     en: {
       badge: "Level Up Your Streams",
       desc: "Modern, transparent and real-time live stream widgets for OBS, Streamlabs and Kick.",
       btn: "Customize →",
-      widgets: [
-        {
-          id: "viewer-count",
-          title: "Kick Live Viewers",
-          desc: "Transparent neon badge showing real-time Kick viewer count.",
-          href: "/builder/viewer-count",
-        },
-        {
-          id: "chat-box",
-          title: "Kick Live Chat Box",
-          desc: "Ultra lightweight chat overlay with official Kick badges and emotes.",
-          href: "/builder/chat-box",
-        },
-        {
-          id: "follower-goal",
-          title: "Follower Goal",
-          desc: "Real-time progress bar pulling follower count automatically.",
-          href: "/builder/follower-goal",
-        },
-        {
-          id: "sub-goal",
-          title: "Sub Goal",
-          desc: "Live progress bar updating instantly with new subs and gifted subs.",
-          href: "/builder/sub-goal",
-        },
-        {
-          id: "irl-hud",
-          title: "IRL Stream HUD",
-          desc: "Modular LIVE badge, clock, location, weather and real-time battery status.",
-          href: "/builder/irl-hud",
-        },
-        {
-          id: "clock",
-          title: "Minimal Digital Clock",
-          desc: "Sleek glassmorphic digital clock overlay for streams.",
-          href: "/builder/clock",
-        },
-        
-      ],
+          widgets: [
+      {
+        id: "viewer-count",
+        title: "Kick Live Viewers",
+        desc: "Transparent neon badge showing real-time Kick viewer count.",
+        href: "/builder/viewer-count",
+      },
+      {
+        id: "chat-box",
+        title: "Kick Live Chat Box",
+        desc: "Ultra lightweight chat overlay with official Kick badges and emotes.",
+        href: "/builder/chat-box",
+      },
+      {
+        id: "follower-goal",
+        title: "Follower Goal",
+        desc: "Dynamic progress bar for Kick followers with live sync.",
+        href: "/builder/follower-goal",
+      },
+      {
+        id: "sub-goal",
+        title: "Subscriber Goal",
+        desc: "Live updating progress bar for Kick subs and gifted subs.",
+        href: "/builder/sub-goal",
+      },
+      {
+        id: "irl-hud",
+        title: "IRL Stream HUD",
+        desc: "Modular LIVE badge, clock, location, weather and live battery overlay for IRL streams.",
+        href: "/builder/irl-hud",
+      },
+      {
+        id: "mini-map",
+        title: "NFS Mini-Map Radar",
+        desc: "GTA/NFS style live radar map, speedometer HUD, and instant phone GPS sync.",
+        href: "/builder/mini-map",
+      },
+      {
+        id: "clock",
+        title: "Minimal Digital Clock",
+        desc: "Clean, frosted glass style digital clock overlay for OBS.",
+        href: "/builder/clock",
+      },
+    ],
     },
   };
 
