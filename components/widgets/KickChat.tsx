@@ -7,7 +7,6 @@ interface ChatMessage {
   user: string;
   content: string;
   color: string;
-  badges?: string[];
 }
 
 export default function KickChatWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
@@ -18,34 +17,33 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
   useEffect(() => {
     let ws: WebSocket | null = null;
     let keepAlive: any = null;
+    let isSubscribed = false;
 
-    const connectChat = async () => {
-      let chatroomId = '1917711'; // itsfatih fallback
+    const startChat = async () => {
+      let resolvedChatroomId: string | null = null;
 
-      // 1. Dinamik chatroom ID sorgusu
       try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`);
+        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          if (data.chatroom?.id) {
-            chatroomId = String(data.chatroom.id);
-          } else if (data.chatroom_id) {
-            chatroomId = String(data.chatroom_id);
+          if (data.chatroom_id) {
+            resolvedChatroomId = String(data.chatroom_id);
           }
         }
       } catch (e) {}
 
-      // 2. Kick Global Pusher WebSocket Bağlantısı
       ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
 
       ws.onopen = () => {
-        // Chat kanalına abone ol
-        ws?.send(
-          JSON.stringify({
-            event: 'pusher:subscribe',
-            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
-          })
-        );
+        if (resolvedChatroomId) {
+          ws?.send(
+            JSON.stringify({
+              event: 'pusher:subscribe',
+              data: { auth: '', channel: `chatrooms.${resolvedChatroomId}.v2` },
+            })
+          );
+          isSubscribed = true;
+        }
       };
 
       ws.onmessage = (event) => {
@@ -61,15 +59,13 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
               user: rawData.sender?.username || 'Kullanıcı',
               content: rawData.content || '',
               color: rawData.sender?.identity?.color || '#53FC18',
-              badges: rawData.sender?.identity?.badges?.map((b: any) => b.type) || [],
             };
 
-            setMessages((prev) => [...prev.slice(-30), newMsg]);
+            setMessages((prev) => [...prev.slice(-40), newMsg]);
           }
         } catch (err) {}
       };
 
-      // Canlı tutma ping'i
       keepAlive = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
@@ -77,7 +73,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       }, 25000);
     };
 
-    connectChat();
+    startChat();
 
     return () => {
       if (ws) ws.close();
@@ -85,7 +81,6 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     };
   }, [channel]);
 
-  // Otomatik aşağı kaydırma
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
@@ -96,15 +91,12 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     <div className="w-screen h-screen flex flex-col justify-end p-6 bg-transparent select-none font-sans overflow-hidden">
       <div
         ref={chatContainerRef}
-        className="flex flex-col space-y-2.5 max-h-[85vh] overflow-y-auto scrollbar-none pr-2"
+        className="flex flex-col space-y-2.5 max-h-[90vh] overflow-y-auto scrollbar-none pr-2"
       >
         {messages.map((m) => (
           <div
             key={m.id}
-            className="bg-[#0a0d14]/85 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 text-xs shadow-2xl max-w-lg animate-in fade-in slide-in-from-bottom-3 duration-300 flex flex-col gap-0.5"
-            style={{
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-            }}
+            className="bg-[#0a0d14]/90 backdrop-blur-xl border border-white/10 rounded-2xl px-4 py-2.5 text-xs shadow-2xl max-w-lg animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5"
           >
             <div className="flex items-center gap-1.5">
               <span

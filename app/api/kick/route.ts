@@ -1,46 +1,46 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const channel = searchParams.get('channel');
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const channel = (searchParams.get("channel") || "itsfatih").toLowerCase().trim();
 
-  if (!channel) {
-    return NextResponse.json({ error: 'Kanal adı gerekli' }, { status: 400 });
-  }
-
-  const clean = channel.trim().toLowerCase();
-
-  // 1. Kick Webhook & Public API resolver
   try {
-    const res = await fetch(`https://kick.com/api/v1/channels/${clean}`, {
+    const res = await fetch("https://kick.com/api/v2/channels/" + encodeURIComponent(channel) + "/chatroom", {
       headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "application/json",
       },
-      next: { revalidate: 15 },
+      cache: "no-store",
     });
 
     if (res.ok) {
       const data = await res.json();
       return NextResponse.json({
-        id: data?.id || data?.chatroom?.channel_id,
-        slug: data?.slug || clean,
-        username: data?.user?.username || clean,
-        followersCount: data?.followersCount || data?.followers_count || 0,
-        chatroomId: data?.chatroom?.id,
-        livestream: data?.livestream || null,
-        subscriberBadges: data?.subscriber_badges || [],
+        success: true,
+        chatroom_id: data.id || (data.data && data.data.id),
       });
     }
-  } catch (e) {}
 
-  // 2. Fallback: İstemciye bağlanması için temel veri
-  return NextResponse.json({
-    id: clean,
-    slug: clean,
-    username: clean,
-    chatroomId: null,
-    livestream: null,
-    isFallback: true,
-  });
+    const v1Res = await fetch("https://kick.com/api/v1/channels/" + encodeURIComponent(channel), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    if (v1Res.ok) {
+      const dataV1 = await v1Res.json();
+      return NextResponse.json({
+        success: true,
+        chatroom_id: dataV1.chatroom?.id || dataV1.chatroom_id,
+        followers_count: dataV1.followers_count || dataV1.followersCount || 0,
+        subscribers_count: dataV1.subscribers_count || dataV1.subscriber_badges?.length || 0,
+      });
+    }
+
+    return NextResponse.json({ success: false, error: "Channel not found" }, { status: 404 });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
 }
