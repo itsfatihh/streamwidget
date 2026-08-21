@@ -662,3 +662,108 @@ export default function DynamicWidgetPage({ params }: { params: Promise<{ slug: 
 }
 
 
+
+
+function MiniMapWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
+  const channel = searchParams.channel || 'itsfatih';
+  const shape = searchParams.shape || 'circle';
+  const accent = searchParams.accent || '#53FC18';
+  const showSpeed = searchParams.showSpeed !== 'false';
+
+  const [pos, setPos] = useState<{ lat: number; lng: number; speed: number; heading: number | null }>({
+    lat: 49.4875, // Varsayılan konum
+    lng: 8.4660,
+    speed: 0,
+    heading: 0,
+  });
+  const [status, setStatus] = useState<'connecting' | 'live'>('connecting');
+
+  useEffect(() => {
+    const fetchGPS = async () => {
+      try {
+        const res = await fetch(`/api/gps?channel=${channel}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.lat) {
+            setPos({
+              lat: data.lat,
+              lng: data.lng,
+              speed: Math.round(data.speed || 0),
+              heading: data.heading || 0,
+            });
+            setStatus('live');
+          }
+        }
+      } catch (e) {
+        // sessizce devam et
+      }
+    };
+
+    fetchGPS();
+    const interval = setInterval(fetchGPS, 1500);
+    return () => clearInterval(interval);
+  }, [channel]);
+
+  // OpenStreetMap / Carto Dark Tiles hesaplaması
+  const zoom = 16;
+  const n = Math.pow(2, zoom);
+  const latRad = (pos.lat * Math.PI) / 180;
+  const xtile = Math.floor(((pos.lng + 180) / 360) * n);
+  const ytile = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
+
+  return (
+    <div className="w-screen h-screen flex items-center justify-center bg-transparent p-4">
+      <div
+        className={`relative overflow-hidden border-2 shadow-2xl transition-all duration-300 ${
+          shape === 'circle' ? 'w-64 h-64 rounded-full' : 'w-64 h-64 rounded-3xl'
+        }`}
+        style={{
+          borderColor: accent,
+          backgroundColor: '#0a0d14',
+          boxShadow: `0 0 25px ${accent}33`,
+        }}
+      >
+        {/* Harita Katmanı (CartoDB Dark Matter) */}
+        <div
+          className="absolute inset-0 bg-cover bg-center transition-all duration-700"
+          style={{
+            backgroundImage: `url('https://a.basemaps.cartocdn.com/dark_all/${zoom}/${xtile}/${ytile}.png')`,
+            filter: 'brightness(0.9) contrast(1.1)',
+            transform: `scale(1.8) rotate(-${pos.heading || 0}deg)`,
+          }}
+        />
+
+        {/* Radar Izgarası & Efekti */}
+        <div className="absolute inset-0 bg-[radial-gradient(#ffffff10_1px,transparent_1px)] [background-size:16px_16px]" />
+        <div className="absolute inset-0 rounded-full border border-dashed border-white/15 pointer-events-none" />
+
+        {/* Merkez Ok (Yön & Oyuncu İkonu) */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="relative flex flex-col items-center">
+            <div
+              className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[18px] drop-shadow-[0_0_8px_currentColor]"
+              style={{ borderBottomColor: accent, color: accent }}
+            />
+            <div className="w-2.5 h-2.5 rounded-full bg-white -mt-1 shadow-md border border-black" />
+          </div>
+        </div>
+
+        {/* Canlı GPS / Hız Rozeti */}
+        {showSpeed && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/85 backdrop-blur-md px-3 py-1 rounded-xl border border-white/15 flex items-baseline gap-1 shadow-lg">
+            <span className="text-base font-black font-mono text-white tracking-wider">{pos.speed}</span>
+            <span className="text-[9px] font-bold text-white/50">KM/H</span>
+          </div>
+        )}
+
+        {/* Durum Rozeti */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/75 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1.5">
+          <div className={`w-1.5 h-1.5 rounded-full ${status === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+          <span className="text-[9px] font-black tracking-widest text-white/80 uppercase">
+            {status === 'live' ? 'GPS LIVE' : 'SYNCING'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
