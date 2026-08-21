@@ -1,80 +1,60 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const manualLocation = searchParams.get('location');
-
-  let city = '';
-  let lat: number | null = null;
-  let lon: number | null = null;
+  let city = searchParams.get("city");
+  let lat = searchParams.get("lat");
+  let lon = searchParams.get("lon");
 
   try {
-    // 1. Manuel şehir girilmişse koordinatlarını bul
-    if (manualLocation && manualLocation.toLowerCase() !== 'auto') {
-      city = manualLocation;
-      const geoRes = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(manualLocation)}&count=1&language=tr&format=json`
-      );
-      if (geoRes.ok) {
-        const geoData = await geoRes.json();
-        if (geoData?.results?.[0]) {
-          lat = geoData.results[0].latitude;
-          lon = geoData.results[0].longitude;
-          city = geoData.results[0].name || manualLocation;
-        }
-      }
-    } else {
-      // 2. Otomatik: Vercel Edge Coğrafi Başlıklarını Kullan
-      const vercelCity = req.headers.get('x-vercel-ip-city');
-      const vercelLat = req.headers.get('x-vercel-ip-latitude');
-      const vercelLon = req.headers.get('x-vercel-ip-longitude');
-
-      if (vercelCity && vercelLat && vercelLon) {
-        city = decodeURIComponent(vercelCity);
-        lat = parseFloat(vercelLat);
-        lon = parseFloat(vercelLon);
-      } else {
-        // Fallback: ip-api.com
-        const ipRes = await fetch('http://ip-api.com/json/?fields=status,city,lat,lon');
-        if (ipRes.ok) {
-          const ipData = await ipRes.json();
-          if (ipData.status === 'success') {
-            city = ipData.city;
-            lat = ipData.lat;
-            lon = ipData.lon;
-          }
-        }
+    // 1. Koordinat veya şehir yoksa IP üzerinden konum çöz
+    if (!lat || !lon) {
+      const ipRes = await fetch("https://ipapi.co/json/", { cache: "no-store" });
+      if (ipRes.ok) {
+        const ipData = await ipRes.json();
+        lat = String(ipData.latitude);
+        lon = String(ipData.longitude);
+        if (!city) city = ipData.city || "Konum";
       }
     }
 
-    // 3. Hava Durumunu Çek
-    let temperature = null;
+    if (!lat || !lon) {
+      return NextResponse.json({
+        city: city || "İstanbul",
+        temp: 24,
+        condition: "Güneşli",
+      });
+    }
+
+    // 2. Open-Meteo API ile canlı sıcaklık al
+    const weatherRes = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`,
+      { cache: "no-store" }
+    );
+
+    let temp = 23;
     let weatherCode = 0;
 
-    if (lat !== null && lon !== null) {
-      const weatherRes = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`,
-        { next: { revalidate: 300 } }
-      );
-      if (weatherRes.ok) {
-        const wData = await weatherRes.json();
-        if (wData?.current) {
-          temperature = `${Math.round(wData.current.temperature_2m)}°C`;
-          weatherCode = wData.current.weather_code;
-        }
+    if (weatherRes.ok) {
+      const wData = await weatherRes.json();
+      if (wData.current_weather) {
+        temp = Math.round(wData.current_weather.temperature);
+        weatherCode = wData.current_weather.weathercode;
       }
     }
 
     return NextResponse.json({
-      city: city || 'Canlı Konum',
-      temperature: temperature || '24°C',
+      success: true,
+      city: city || "İstanbul",
+      temp,
       weatherCode,
     });
-  } catch (error) {
+  } catch (err: any) {
     return NextResponse.json({
-      city: manualLocation && manualLocation !== 'auto' ? manualLocation : 'Canlı Konum',
-      temperature: '24°C',
-      weatherCode: 0,
+      success: false,
+      city: city || "İstanbul",
+      temp: 23,
+      error: err.message,
     });
   }
 }
