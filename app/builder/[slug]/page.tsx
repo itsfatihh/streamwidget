@@ -57,6 +57,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
 
   const [formState, setFormState] = useState<Record<string, string>>(initialForm);
   const [copied, setCopied] = useState(false);
+  const [liveViewers, setLiveViewers] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState("22:15:37");
 
   const [autoCity, setAutoCity] = useState<string>("Palavas-les-Flots");
@@ -154,6 +155,33 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const queryString = searchParams.toString() ? "?" + searchParams.toString() : "";
   const finalObsUrl = baseUrl + "/w/" + widget.id + queryString;
+
+
+  useEffect(() => {
+    if (widget.id !== "kick-viewers") return;
+    const ch = (formState.channel || "itsfatih").trim().toLowerCase();
+    
+    const fetchLive = async () => {
+      try {
+        const res = await fetch(`/api/kick?channel=${encodeURIComponent(ch)}&_t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.livestream) {
+            setLiveViewers(Number(data.livestream.viewer_count || data.livestream.viewers || 0));
+          } else {
+            setLiveViewers(0);
+          }
+        }
+      } catch (e) {
+        setLiveViewers(null);
+      }
+    };
+
+    fetchLive();
+    const timer = setInterval(fetchLive, 15000);
+    return () => clearInterval(timer);
+  }, [widget.id, formState.channel]);
+
 
   const handleCopy = () => {
     navigator.clipboard.writeText(finalObsUrl);
@@ -288,7 +316,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                       <div className="flex items-center gap-3 bg-black/85 backdrop-blur-xl px-5 py-2.5 rounded-2xl border text-white shadow-2xl" style={{ borderColor: `${accent}50` }}>
                         <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: accent }} />
                         <span className="text-xs font-mono font-bold text-neutral-300 uppercase">{formState.channel || "itsfatih"}</span>
-                        <span className="text-sm font-black font-mono" style={{ color: accent }}>148</span>
+                        <span className="text-sm font-black font-mono" style={{ color: accent }}>{liveViewers !== null ? liveViewers.toLocaleString("tr-TR") : (formState.channel ? "0" : "148")}</span>
                       </div>
                     )}
 
