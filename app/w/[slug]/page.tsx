@@ -6,20 +6,38 @@ function FollowerGoalWidget({ searchParams }: { searchParams: Record<string, str
   const channel = (searchParams.channel || "itsfatih").toLowerCase().trim();
   const target = parseInt(searchParams.target || "1000", 10);
   const accent = searchParams.accent || "#53FC18";
-  const [current, setCurrent] = useState<number>(342);
+  const [current, setCurrent] = useState<number>(0);
+  const [loaded, setLoaded] = useState<boolean>(false);
 
   useEffect(() => {
-    const fetchFollowers = async () => {
+    const fetchStats = async () => {
       try {
-        const res = await fetch("https://kick.com/api/v1/channels/" + channel);
+        const res = await fetch("/api/kick?channel=" + encodeURIComponent(channel), { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (data.followers_count !== undefined) setCurrent(data.followers_count);
+          if (data && typeof data.followers_count === "number") {
+            setCurrent(data.followers_count);
+            setLoaded(true);
+            return;
+          }
         }
       } catch (e) {}
+
+      // Fallback: dogrudan Kick API
+      try {
+        const resDirect = await fetch("https://kick.com/api/v1/channels/" + encodeURIComponent(channel));
+        if (resDirect.ok) {
+          const d = await resDirect.json();
+          if (d && typeof d.followers_count === "number") {
+            setCurrent(d.followers_count);
+            setLoaded(true);
+          }
+        }
+      } catch (err) {}
     };
-    fetchFollowers();
-    const interval = setInterval(fetchFollowers, 10000);
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 8000);
     return () => clearInterval(interval);
   }, [channel]);
 
@@ -33,7 +51,9 @@ function FollowerGoalWidget({ searchParams }: { searchParams: Record<string, str
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />
             TAKİPÇİ HEDEFİ
           </span>
-          <span className="text-white font-mono">{current} / {target} ({percentage}%)</span>
+          <span className="text-white font-mono">
+            {loaded ? current.toLocaleString() : "..."} / {target.toLocaleString()} ({percentage}%)
+          </span>
         </div>
         <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/10">
           <div
@@ -50,7 +70,28 @@ function SubGoalWidget({ searchParams }: { searchParams: Record<string, string |
   const channel = (searchParams.channel || "itsfatih").toLowerCase().trim();
   const target = parseInt(searchParams.target || "50", 10);
   const accent = searchParams.accent || "#53FC18";
-  const [current] = useState<number>(18);
+  const [current, setCurrent] = useState<number>(0);
+  const [loaded, setLoaded] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const res = await fetch("/api/kick?channel=" + encodeURIComponent(channel), { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data.subscribers_count === "number") {
+            setCurrent(data.subscribers_count);
+            setLoaded(true);
+            return;
+          }
+        }
+      } catch (e) {}
+    };
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 10000);
+    return () => clearInterval(interval);
+  }, [channel]);
 
   const percentage = Math.min(100, Math.max(0, Math.round((current / target) * 100)));
 
@@ -62,7 +103,9 @@ function SubGoalWidget({ searchParams }: { searchParams: Record<string, string |
             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: accent }} />
             ABONE HEDEFİ
           </span>
-          <span className="text-white font-mono">{current} / {target} ({percentage}%)</span>
+          <span className="text-white font-mono">
+            {loaded ? current.toLocaleString() : "..."} / {target.toLocaleString()} ({percentage}%)
+          </span>
         </div>
         <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden p-0.5 border border-white/10">
           <div
