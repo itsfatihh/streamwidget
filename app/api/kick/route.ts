@@ -18,13 +18,10 @@ export async function GET(req: NextRequest) {
     if (res.ok) {
       const data = await res.json();
       const subBadges: Record<number, string> = {};
-
       if (Array.isArray(data.subscriber_badges)) {
         data.subscriber_badges.forEach((b: any) => {
-          const months = b.months;
-          const url = b.badge_image?.url || b.badge_image?.src || (b.badge_image?.id ? "https://files.kick.com/subscriber_badges/" + b.badge_image.id + "/fullsize" : null);
-          if (months !== undefined && url) {
-            subBadges[months] = url;
+          if (b.months !== undefined && b.badge_image?.url) {
+            subBadges[b.months] = b.badge_image.url;
           }
         });
       }
@@ -43,19 +40,10 @@ export async function GET(req: NextRequest) {
 
     if (v1Res.ok) {
       const dataV1 = await v1Res.json();
-      const subBadgesV1: Record<number, string> = {};
-      if (Array.isArray(dataV1.subscriber_badges)) {
-        dataV1.subscriber_badges.forEach((b: any) => {
-          if (b.months !== undefined && b.badge_image?.url) {
-            subBadgesV1[b.months] = b.badge_image.url;
-          }
-        });
-      }
-
       return NextResponse.json({
         success: true,
         chatroom_id: dataV1.chatroom?.id || dataV1.chatroom_id,
-        subscriber_badges: subBadgesV1,
+        subscriber_badges: {},
       });
     }
 
