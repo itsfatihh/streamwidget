@@ -49,7 +49,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
     return () => clearInterval(timer);
   }, [showClock]);
 
-  // 2. Konum ve Hava Durumu
+  // 2. IP veya Komut Konumu ve Hava Durumu
   useEffect(() => {
     if (!showLocation && !showWeather) return;
 
@@ -64,7 +64,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
         if (commandCity) {
           cityName = commandCity;
           const geoRes = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(commandCity)}&count=1&language=en&format=json`
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(commandCity)}&count=1&language=tr&format=json`
           );
           if (geoRes.ok) {
             const geoData = await geoRes.json();
@@ -116,25 +116,26 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
     };
   }, [showLocation, showWeather, commandCity]);
 
-  // 3. Dinamik Kick Chat Odası & Pusher WS
+  // 3. Evrensel Dinamik Kick Kanalı Chat Dinleyicisi
   useEffect(() => {
     let ws: WebSocket | null = null;
     let pingInterval: any = null;
     let isCancelled = false;
 
-    const startPusherListener = async () => {
+    const connectToChannelChat = async () => {
       let chatroomId = '';
 
-      // Herhangi bir Kick kanalının gerçek chat ID'sini dinamik çöz
       try {
         const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.chatroom_id) {
+          if (data?.chatroom_id) {
             chatroomId = String(data.chatroom_id);
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('Kick channel resolution error:', e);
+      }
 
       if (isCancelled || !chatroomId) return;
 
@@ -220,7 +221,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
       }, 15000);
     };
 
-    startPusherListener();
+    connectToChannelChat();
 
     return () => {
       isCancelled = true;
