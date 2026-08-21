@@ -23,7 +23,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Emote Parser: [emote:ID:name] ve standart Kick CDN desteği
+  // Emote Parser: [emote:12345:emoteName] -> Inline Image
   const renderMessageContent = (content: string) => {
     if (!content) return '';
 
@@ -72,19 +72,18 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
     let pingInterval: NodeJS.Timeout | null = null;
     let isCancelled = false;
 
-    async function connect() {
+    async function initChat() {
       try {
-        // Chatroom ID'yi API'den al
-        const res = await fetch(`/api/kick-chat?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         const data = await res.json();
-        const chatroomId = data?.chatroom_id || data?.chatroom?.id;
+        const chatroomId = data?.chatroom?.id || data?.chatroom_id;
 
         if (!chatroomId || isCancelled) return;
 
         ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f28308142977d07?protocol=7&client=js&version=7.6.0&flash=false');
 
         ws.onopen = () => {
-          // Kanala abone ol
+          // Chat odasına abone ol
           ws?.send(
             JSON.stringify({
               event: 'pusher:subscribe',
@@ -92,12 +91,12 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
             })
           );
 
-          // Canlı tutmak için 30 saniyede bir ping gönder
+          // Canlı tutmak için 25 saniyede bir ping gönder
           pingInterval = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
             }
-          }, 30000);
+          }, 25000);
         };
 
         ws.onmessage = (event) => {
@@ -106,22 +105,21 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
             if (parsed.event === 'App\\Events\\ChatMessageEvent') {
               const msgData = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
               if (msgData?.content && msgData?.sender) {
-                setMessages((prev) => [...prev.slice(-40), msgData]);
+                setMessages((prev) => [...prev.slice(-50), msgData]);
               }
             }
           } catch (e) {}
         };
 
-        ws.onerror = () => {};
         ws.onclose = () => {
           if (!isCancelled) {
-            setTimeout(connect, 3000); // Kapanırsa 3 saniye sonra tekrar bağlan
+            setTimeout(initChat, 3000);
           }
         };
       } catch (err) {}
     }
 
-    connect();
+    initChat();
 
     return () => {
       isCancelled = true;
@@ -160,6 +158,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
                   : 'bg-[#0b0e14]/90 border-white/10 text-white shadow-black/40'
               }`}
             >
+              {/* Rozetler */}
               {showBadges && msg.sender?.identity?.badges && (
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {msg.sender.identity.badges.map((b, i) => (
@@ -173,10 +172,12 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
                 </div>
               )}
 
+              {/* Kullanıcı Adı */}
               <span className="font-black flex-shrink-0" style={{ color: userColor }}>
                 {msg.sender?.username}:
               </span>
 
+              {/* Mesaj İçeriği + Emote'lar */}
               <span className="font-medium break-words leading-relaxed flex-1 min-w-0">
                 {renderMessageContent(msg.content)}
               </span>
