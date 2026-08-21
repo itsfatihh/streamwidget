@@ -1,60 +1,106 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
 
-function GpsTransmitter() {
+function GpsTrackerContent() {
   const searchParams = useSearchParams();
-  const initialSession = searchParams.get('session') || 'itsfatih';
+  const initialSession = searchParams.get('session') || searchParams.get('channel') || 'itsfatih';
 
   const [session, setSession] = useState(initialSession);
-  const [isTransmitting, setIsTransmitting] = useState(false);
-  const [gpsData, setGpsData] = useState<{ lat: number; lng: number; speed: number; heading: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [isTracking, setIsTracking] = useState(false);
+  const [status, setStatus] = useState<string>('Hazır');
+  const [gpsData, setGpsData] = useState<{
+    lat: number;
+    lng: number;
+    speed: number;
+    heading: number;
+    accuracy: number;
+  }>({
+    lat: 0,
+    lng: 0,
+    speed: 0,
+    heading: 0,
+    accuracy: 0,
+  });
+  const [lastSent, setLastSent] = useState<string>('--');
+  const [wakeLock, setWakeLock] = useState<boolean>(false);
 
   const watchIdRef = useRef<number | null>(null);
 
+  // Ekranın kapanmasını engelle (Wake Lock API)
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && isTracking) {
+        try {
+          await (navigator as any).wakeLock.request('screen');
+          setWakeLock(true);
+        } catch (e) {
+          console.warn('Wake Lock alınamadı', e);
+        }
+      }
+    };
+    if (isTracking) requestWakeLock();
+  }, [isTracking]);
+
+  const sendLocation = async (lat: number, lng: number, speed: number, heading: number) => {
+    try {
+      const res = await fetch('/api/gps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channel: session.trim(),
+          session: session.trim(),
+          lat,
+          lng,
+          speed,
+          heading,
+        }),
+      });
+      if (res.ok) {
+        setLastSent(new Date().toLocaleTimeString('tr-TR'));
+        setStatus('Canlı Gönderiliyor');
+      }
+    } catch (e) {
+      setStatus('Bağlantı Hatası');
+    }
+  };
+
   const startTracking = () => {
     if (!navigator.geolocation) {
-      setError('Cihazınızda GPS / Konum desteği bulunamadı.');
+      alert('Cihazınızda GPS desteği bulunamadı.');
       return;
     }
 
-    setError(null);
-    setIsTransmitting(true);
+    setStatus('GPS Aranıyor...');
+    setIsTracking(true);
 
     watchIdRef.current = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const speedKmh = pos.coords.speed !== null ? Math.round(pos.coords.speed * 3.6) : 0;
-        const currentData = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        // m/s -> km/h dönüşümü
+        const speedKmh = pos.coords.speed !== null && pos.coords.speed >= 0 ? Math.round(pos.coords.speed * 3.6) : 0;
+        const headingDeg = pos.coords.heading !== null && !isNaN(pos.coords.heading) ? Math.round(pos.coords.heading) : 0;
+        const accuracy = Math.round(pos.coords.accuracy || 0);
+
+        setGpsData({
+          lat,
+          lng,
           speed: speedKmh,
-          heading: pos.coords.heading || 0,
-        };
+          heading: headingDeg,
+          accuracy,
+        });
 
-        setGpsData(currentData);
-
-        try {
-          await fetch('/api/gps', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              session,
-              ...currentData,
-            }),
-          });
-        } catch (e) {}
+        sendLocation(lat, lng, speedKmh, headingDeg);
       },
       (err) => {
-        setError(err.message);
-        setIsTransmitting(false);
+        setStatus(`GPS Hatası: ${err.message}`);
       },
       {
         enableHighAccuracy: true,
-        maximumAge: 1000,
         timeout: 10000,
+        maximumAge: 0,
       }
     );
   };
@@ -64,70 +110,91 @@ function GpsTransmitter() {
       navigator.geolocation.clearWatch(watchIdRef.current);
       watchIdRef.current = null;
     }
-    setIsTransmitting(false);
+    setIsTracking(false);
+    setStatus('Durduruldu');
   };
 
   return (
-    <div className="min-h-screen bg-[#090b10] text-slate-100 flex flex-col items-center justify-center p-6 font-sans">
-      <div className="max-w-md w-full bg-white/[0.04] border border-white/10 rounded-3xl p-6 backdrop-blur-xl space-y-6 shadow-2xl">
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            STREAMWIDGET GPS RADAR
-          </div>
-          <h1 className="text-xl font-black tracking-tight text-white">Canlı Konum Vericisi</h1>
-          <p className="text-xs text-slate-400">Bu sayfayı yayındayken telefonunuzda açık tutun.</p>
+    <div className="min-h-screen bg-[#07090e] text-white flex flex-col items-center justify-between p-6 font-sans select-none">
+      <header className="w-full max-w-md flex items-center justify-between py-4 border-b border-white/10">
+        <div>
+          <h1 className="text-xl font-black tracking-tight text-emerald-400">STREAMWIDGET GPS</h1>
+          <p className="text-xs text-white/50">Canlı Mobil Radar Vericisi</p>
         </div>
+        <div className="flex items-center gap-2">
+          <span className={`w-2.5 h-2.5 rounded-full ${isTracking ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'}`} />
+          <span className="text-xs font-bold font-mono uppercase">{isTracking ? 'ONLINE' : 'OFFLINE'}</span>
+        </div>
+      </header>
 
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-slate-300">Yayıncı / Oturum Adı</label>
+      <main className="w-full max-w-md my-auto space-y-6">
+        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 space-y-4">
+          <label className="text-xs font-bold text-white/60 uppercase tracking-wider block">Oturum / Kanal Adı</label>
           <input
             type="text"
             value={session}
+            disabled={isTracking}
             onChange={(e) => setSession(e.target.value)}
-            disabled={isTransmitting}
-            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-emerald-500"
+            className="w-full bg-black/60 border border-white/20 rounded-xl px-4 py-3 text-base font-bold text-white focus:outline-none focus:border-emerald-400 disabled:opacity-60"
+            placeholder="itsfatih"
           />
         </div>
 
-        {error && (
-          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs">
-            {error}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-center">
+            <span className="text-[10px] font-bold text-white/40 uppercase">Anlık Hız</span>
+            <div className="text-3xl font-black font-mono text-emerald-400 mt-1">{gpsData.speed}</div>
+            <span className="text-[10px] text-white/50 font-bold">KM/H</span>
           </div>
-        )}
+          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-center">
+            <span className="text-[10px] font-bold text-white/40 uppercase">Pusula / Yön</span>
+            <div className="text-3xl font-black font-mono text-white mt-1">{gpsData.heading}°</div>
+            <span className="text-[10px] text-white/50 font-bold">AÇI</span>
+          </div>
+        </div>
 
-        {gpsData && (
-          <div className="grid grid-cols-2 gap-3 bg-black/30 p-4 rounded-2xl border border-white/5 font-mono text-center">
-            <div>
-              <div className="text-[10px] text-slate-400 uppercase">Hız</div>
-              <div className="text-2xl font-black text-emerald-400">{gpsData.speed} <span className="text-xs">km/s</span></div>
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400 uppercase">Pusula</div>
-              <div className="text-2xl font-black text-white">{Math.round(gpsData.heading)}°</div>
-            </div>
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-2 text-xs font-mono">
+          <div className="flex justify-between">
+            <span className="text-white/40">Durum:</span>
+            <span className="font-bold text-emerald-400">{status}</span>
           </div>
-        )}
+          <div className="flex justify-between">
+            <span className="text-white/40">Enlem / Boylam:</span>
+            <span className="text-white/80">{gpsData.lat ? `${gpsData.lat.toFixed(5)}, ${gpsData.lng.toFixed(5)}` : '--'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-white/40">Hassasiyet:</span>
+            <span className="text-white/80">{gpsData.accuracy ? `±${gpsData.accuracy}m` : '--'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-white/40">Son Gönderim:</span>
+            <span className="text-white/80">{lastSent}</span>
+          </div>
+        </div>
 
         <button
-          onClick={isTransmitting ? stopTracking : startTracking}
-          className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition shadow-lg ${
-            isTransmitting
-              ? 'bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30'
-              : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20'
+          onClick={isTracking ? stopTracking : startTracking}
+          className={`w-full py-4 rounded-2xl font-black text-lg tracking-wider transition-all duration-300 shadow-xl ${
+            isTracking
+              ? 'bg-red-500/20 text-red-400 border border-red-500/50 hover:bg-red-500/30'
+              : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-emerald-500/20'
           }`}
         >
-          {isTransmitting ? 'Takibi Durdur' : 'GPS Bağlantısını Başlat'}
+          {isTracking ? 'GPS TAKİBİNİ DURDUR' : 'KONUMU BAŞLAT'}
         </button>
-      </div>
+      </main>
+
+      <footer className="w-full max-w-md text-center py-3 text-[11px] text-white/30 border-t border-white/5">
+        StreamWidget GPS Transmitter • Açık Tutunuz
+      </footer>
     </div>
   );
 }
 
 export default function GpsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#090b10]" />}>
-      <GpsTransmitter />
+    <Suspense fallback={<div className="min-h-screen bg-[#07090e] text-white flex items-center justify-center">Yükleniyor...</div>}>
+      <GpsTrackerContent />
     </Suspense>
   );
 }
