@@ -1,13 +1,14 @@
 'use client';
 
-function normalizeSlug(s: string) {
-  const c = (s || "").toLowerCase().trim();
-  if (["mini-map", "radar", "radar-hud", "map"].includes(c)) return "mini-map";
-  const clean = s.toLowerCase().trim();
+function normalizeSlug(raw: string) {
+  const clean = (raw || "").toLowerCase().trim();
+  if (["mini-map", "radar", "radar-hud", "map", "nfs-mini-map", "nfs-radar"].includes(clean)) return "mini-map";
+  if (["viewer-count", "viewers", "kick-viewers", "live-viewers"].includes(clean)) return "kick-viewers";
   if (["chat-box", "chat", "kick-chat", "kick-chat-box"].includes(clean)) return "kick-chat";
-  if (["viewer-count", "viewers", "kick-viewers", "kick-viewer-count", "live-viewers"].includes(clean)) return "kick-viewers";
   if (["follower-goal", "followers-goal"].includes(clean)) return "follower-goal";
   if (["sub-goal", "subs-goal"].includes(clean)) return "sub-goal";
+  if (["irl-hud", "irl"].includes(clean)) return "irl-hud";
+  if (["clock", "digital-clock"].includes(clean)) return "clock";
   return clean;
 }
 
