@@ -7,12 +7,18 @@ interface ChatMessage {
   user: string;
   content: string;
   color: string;
-  badges?: string[];
 }
+
+const CHANNEL_CHATROOM_MAP: Record<string, string> = {
+  itsfatih: '1917711',
+  batuhankaradeniz: '2437618',
+  elraenn: '2437618',
+  kendinemuzisyen: '2437618',
+};
 
 export default function KickChatWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
-  const theme = searchParams.theme || 'botrix';
+  const theme = searchParams.theme || 'framed';
   const fontSize = searchParams.fontSize || 'small';
   const textStroke = searchParams.textStroke || 'none';
 
@@ -25,9 +31,8 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     let isCancelled = false;
 
     const startChat = async () => {
-      let chatroomId = '1917711';
+      let chatroomId = CHANNEL_CHATROOM_MAP[channel] || '1917711';
 
-      // 1. Chatroom ID al
       try {
         const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (res.ok) {
@@ -38,13 +43,11 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
         }
       } catch (e) {}
 
-      // Özel kanal eşleştirmeleri (Fallback)
       if (channel === 'batuhankaradeniz') chatroomId = '2437618';
       if (channel === 'itsfatih') chatroomId = '1917711';
 
       if (isCancelled) return;
 
-      // 2. Corard / Botrix'in kullandığı resmi Kick Pusher App Key: 32cbd69e4b950bf97679
       ws = new WebSocket(
         'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0-rc2&flash=false'
       );
@@ -84,7 +87,6 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
               user: sender.username || 'Kullanıcı',
               content: data.content || '',
               color: identity.color || '#53FC18',
-              badges: identity.badges?.map((b: any) => b.type) || [],
             };
 
             setMessages((prev) => [...prev.slice(-40), newMsg]);
@@ -129,6 +131,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       : {};
 
   const renderCard = (msg: ChatMessage) => {
+    // Minimal Tema (Sadece Saf Metin)
     if (theme === 'minimal') {
       return (
         <div key={msg.id} className={`animate-in fade-in slide-in-from-bottom-2 duration-200 ${sizeStyles}`} style={strokeStyle}>
@@ -140,37 +143,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       );
     }
 
-    if (theme === 'bubble') {
-      return (
-        <div
-          key={msg.id}
-          className={`bg-[#121622]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5 ${sizeStyles}`}
-          style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.35)', ...strokeStyle }}
-        >
-          <span className="font-black text-[11px] uppercase tracking-wide" style={{ color: msg.color }}>
-            {msg.user}
-          </span>
-          <p className="text-white/95 font-medium leading-relaxed break-words">{msg.content}</p>
-        </div>
-      );
-    }
-
-    if (theme === 'neon') {
-      return (
-        <div
-          key={msg.id}
-          className={`bg-[#07090e]/95 border border-[#53FC18]/60 rounded-xl shadow-[0_0_15px_rgba(83,252,24,0.15)] animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-baseline gap-2 ${sizeStyles}`}
-          style={strokeStyle}
-        >
-          <span className="font-black uppercase tracking-wider whitespace-nowrap" style={{ color: msg.color }}>
-            {msg.user}:
-          </span>
-          <span className="text-white font-medium break-words">{msg.content}</span>
-        </div>
-      );
-    }
-
-    // Default BotRix Kartı
+    // Çerçeveli Tema (Cam Zemin + Sol Renk Çizgili Kart)
     return (
       <div
         key={msg.id}
