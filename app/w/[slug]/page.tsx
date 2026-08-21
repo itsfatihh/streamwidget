@@ -259,55 +259,48 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     let ws: WebSocket | null = null;
     let keepAlive: any = null;
 
-    const setupPusher = async () => {
-      // 1. Kick sayfasından chatroom ID'yi doğrudan çekmeyi dene
-      let chatroomId: string | null = null;
-      let channelId: string | null = null;
+    const startSocket = async () => {
+      let chatroomId = channel === 'itsfatih' ? '1917711' : '';
 
-      try {
-        const res = await fetch(`https://kick.com/api/v1/channels/${channel}`);
-        if (res.ok) {
-          const data = await res.json();
-          chatroomId = data.chatroom?.id ? String(data.chatroom.id) : null;
-          channelId = data.id ? String(data.id) : null;
-          if (data.pinned_message) {
-            setPinned({
-              id: String(data.pinned_message.id || Date.now()),
-              username: data.pinned_message.sender?.username || 'Moderatör',
-              content: data.pinned_message.content || '',
-              color: data.pinned_message.sender?.identity?.color || accent,
-            });
+      if (!chatroomId) {
+        try {
+          const res = await fetch(`https://kick.com/api/v2/channels/${channel}/chatroom`);
+          if (res.ok) {
+            const d = await res.json();
+            chatroomId = String(d.id || '');
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
 
-      // 2. Pusher Canlı Soket Bağlantısı (Kick Global Cluster)
       ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
 
       ws.onopen = () => {
-        // Kick chatroom ve channel kanallarına abone ol
         if (chatroomId) {
-          ws?.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${chatroomId}.v2` } }));
+          ws?.send(JSON.stringify({
+            event: 'pusher:subscribe',
+            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
+          }));
         }
-        if (channelId) {
-          ws?.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `channel.${channelId}` } }));
-        }
+        // Fallback kanal aboneliği
+        ws?.send(JSON.stringify({
+          event: 'pusher:subscribe',
+          data: { auth: '', channel: `chatroom_${channel}` }
+        }));
       };
 
       ws.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data);
           const ev = parsed.event || '';
+          
+          if (ev.includes('ChatMessagePinned') || ev.includes('PinnedMessage') || ev.includes('pinned')) {
+            if (ev.includes('Unpinned') || ev.includes('Deleted') || ev.includes('unpin')) {
+              setPinned(null);
+              return;
+            }
 
-          // Sabitleme olaylarını yakala
-          if (
-            ev.includes('ChatMessagePinnedEvent') ||
-            ev.includes('PinnedMessageCreatedEvent') ||
-            ev.includes('PinnedMessage') ||
-            ev === 'pinned'
-          ) {
-            const dataObj = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
-            const message = dataObj.message || dataObj.pinned_message || dataObj;
+            const payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
+            const message = payload.message || payload.pinned_message || payload;
             
             setPinned({
               id: String(message.id || Date.now()),
@@ -316,28 +309,20 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
               color: message.sender?.identity?.color || accent,
             });
             playPingSound();
-          } 
-          // Sabitleme kaldırma olaylarını yakala
-          else if (
-            ev.includes('ChatMessageUnpinnedEvent') ||
-            ev.includes('PinnedMessageDeletedEvent') ||
-            ev.includes('Unpin') ||
-            ev.includes('unpinned')
-          ) {
+          } else if (ev.includes('ChatMessageUnpinned') || ev.includes('PinnedMessageDeleted')) {
             setPinned(null);
           }
         } catch (err) {}
       };
 
-      // Bağlantıyı canlı tutma pingi (30s)
       keepAlive = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
         }
-      }, 30000);
+      }, 25000);
     };
 
-    setupPusher();
+    startSocket();
 
     return () => {
       if (ws) ws.close();
