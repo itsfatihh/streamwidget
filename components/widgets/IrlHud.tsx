@@ -178,7 +178,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
             const isAuthorized =
               sender.username?.toLowerCase() === channel ||
               badges.some((b: any) =>
-                ['broadcaster', 'moderator', 'mod', 'founder', 'og'].includes(b.type?.toLowerCase())
+                ['broadcaster', 'moderator', 'mod'].includes(b.type?.toLowerCase())
               );
 
             if (!isAuthorized) return;
