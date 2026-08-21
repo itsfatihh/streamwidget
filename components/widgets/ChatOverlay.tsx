@@ -21,7 +21,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
   const showBadges = searchParams?.show_badges !== 'false';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [statusText, setStatusText] = useState<string>(`Kick sohbeti aranıyor (${channel})...`);
+  const [statusText, setStatusText] = useState<string>(`Oda ID aranıyor (${channel})...`);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   // Emote Parser: [emote:12345:emoteName] -> Inline Image
@@ -37,7 +37,6 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
       if (match.index > lastIdx) {
         parts.push(content.substring(lastIdx, match.index));
       }
-
       const emoteId = match[1];
       const emoteName = match[2];
 
@@ -57,14 +56,12 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
           }}
         />
       );
-
       lastIdx = match.index + match[0].length;
     }
 
     if (lastIdx < content.length) {
       parts.push(content.substring(lastIdx));
     }
-
     return parts.length > 0 ? parts : content;
   };
 
@@ -80,13 +77,14 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
         const chatroomId = data?.chatroom?.id || data?.chatroom_id;
 
         if (!chatroomId) {
-          if (!isCancelled) setStatusText(`Kanal bulunamadı veya çevrimdışı (${channel})`);
+          if (!isCancelled) setStatusText(`Kanal bulunamadı veya gizli (${channel})`);
           return;
         }
 
         if (isCancelled) return;
-        setStatusText(`Sohbete bağlanıldı (${channel}) ✓`);
+        setStatusText(`Sohbete bağlanılıyor...`);
 
+        // Kick resmi Pusher App Key
         ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f28308142977d07?protocol=7&client=js&version=7.6.0&flash=false');
 
         ws.onopen = () => {
@@ -107,10 +105,23 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
         ws.onmessage = (event) => {
           try {
             const parsed = JSON.parse(event.data);
-            if (parsed.event === 'App\\Events\\ChatMessageEvent') {
+            
+            // Abonelik başarıyla gerçekleştiğinde durumu güncelle
+            if (parsed.event === 'pusher_internal:subscription_succeeded') {
+              setStatusText(`Sohbete bağlanıldı (${channel}) ✓`);
+            }
+
+            // Gelen veriyi parse et (Event adına bakmadan içerik analizi yap - Duck Typing)
+            if (parsed.data) {
               const msgData = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
-              if (msgData?.content && msgData?.sender) {
-                setMessages((prev) => [...prev.slice(-50), msgData]);
+              
+              // Eğer gelen veri bir chat mesajı özelliklerini taşıyorsa state'e ekle
+              if (msgData && msgData.content && msgData.sender && msgData.sender.username) {
+                setMessages((prev) => {
+                  // Aynı mesajın (Pusher duplike) tekrardan eklenmesini engelle
+                  if (prev.some((m) => m.id === msgData.id)) return prev;
+                  return [...prev.slice(-49), msgData];
+                });
               }
             }
           } catch (e) {}
@@ -118,6 +129,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
 
         ws.onclose = () => {
           if (!isCancelled) {
+            setStatusText(`Bağlantı koptu, yeniden deneniyor...`);
             setTimeout(initChat, 3000);
           }
         };
@@ -135,6 +147,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
     };
   }, [channel]);
 
+  // Yeni mesaj geldiğinde yumuşak bir şekilde aşağı kaydır
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -153,12 +166,12 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
           </div>
         )}
 
-        {messages.map((msg, index) => {
+        {messages.map((msg) => {
           const userColor = msg.sender?.identity?.color || '#00e701';
 
           return (
             <div
-              key={msg.id || index}
+              key={msg.id}
               className={`flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl border backdrop-blur-md shadow-md animate-[fadeIn_0.2s_ease-out] ${
                 isLight
                   ? 'bg-white/90 border-black/5 text-slate-900 shadow-slate-200/50'
