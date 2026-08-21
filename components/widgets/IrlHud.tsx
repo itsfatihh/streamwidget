@@ -10,21 +10,22 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
   const theme = searchParams?.theme || 'capsule';
 
   const [time, setTime] = useState<string>('');
-  const [location, setLocation] = useState<string>('İstanbul, TR');
+  const [location, setLocation] = useState<string>('Yükleniyor...');
   const [weather, setWeather] = useState<{ temp: string; icon: string }>({
-    temp: '22°C',
-    icon: '☀️',
+    temp: '--°C',
+    icon: '🌤️',
   });
 
-  // Saat Güncelleme
+  // Canlı Saat
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setTime(
-        now.toLocaleTimeString('tr-TR', {
+        now.toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
+          hour12: false,
         })
       );
     };
@@ -33,21 +34,34 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
     return () => clearInterval(interval);
   }, []);
 
-  // IP Tabanlı Konum ve Hava Durumu Çekme
+  // IP Tabanlı Doğru Konum ve Hava Durumu
   useEffect(() => {
-    async function fetchGeoAndWeather() {
+    let isCancelled = false;
+
+    async function fetchWeather() {
       try {
         const res = await fetch('/api/weather', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          if (data?.city) setLocation(`${data.city}, ${data.country || 'TR'}`);
-          if (data?.temp) setWeather({ temp: `${Math.round(data.temp)}°C`, icon: data.icon || '🌤️' });
+          if (!isCancelled) {
+            setLocation(`${data.city}${data.country ? `, ${data.country}` : ''}`);
+            setWeather({
+              temp: `${data.temp}°C`,
+              icon: data.icon || '🌤️',
+            });
+          }
         }
-      } catch (e) {
-        // Hata durumunda varsayılan önizleme verileri korunur
-      }
+      } catch (err) {}
     }
-    fetchGeoAndWeather();
+
+    fetchWeather();
+    // 5 dakikada bir hava durumu yenile
+    const interval = setInterval(fetchWeather, 300000);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -72,7 +86,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
           <div className="flex items-center gap-1.5 px-2 py-0.5 border-r border-white/10 pr-3">
             <span className="text-xs">🕒</span>
             <span className="text-xs font-mono font-bold tracking-tight text-white/90">
-              {time || '12:00:00'}
+              {time || '00:00:00'}
             </span>
           </div>
         )}
