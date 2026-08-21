@@ -1,506 +1,235 @@
 'use client';
 
-function normalizeSlug(raw: string) {
-  const clean = (raw || "").toLowerCase().trim();
-  if (["mini-map", "radar", "radar-hud", "map", "nfs-mini-map", "nfs-radar"].includes(clean)) return "mini-map";
-  if (["viewer-count", "viewers", "kick-viewers", "live-viewers"].includes(clean)) return "kick-viewers";
-  if (["chat-box", "chat", "kick-chat", "kick-chat-box"].includes(clean)) return "kick-chat";
-  if (["follower-goal", "followers-goal"].includes(clean)) return "follower-goal";
-  if (["sub-goal", "subs-goal"].includes(clean)) return "sub-goal";
-  if (["irl-hud", "irl"].includes(clean)) return "irl-hud";
-  if (["clock", "digital-clock"].includes(clean)) return "clock";
-  return clean;
-}
-
-import { useState, useEffect, use, useRef } from 'react';
-import { WIDGETS_LIST } from "@/lib/widgets";
-import { TRANSLATIONS, LangCode } from "@/lib/i18n";
-import LanguageSelector from "@/components/LanguageSelector";
-import Link from "next/link";
-
-function getWeatherIcon(code: number) {
-  if (code === 0) return '☀️';
-  if (code === 1 || code === 2) return '🌤️';
-  if (code === 3) return '☁️';
-  if (code >= 45 && code <= 48) return '🌫️';
-  if (code >= 51 && code <= 67) return '🌧️';
-  if (code >= 71 && code <= 77) return '❄️';
-  if (code >= 80 && code <= 82) return '🌦️';
-  if (code >= 95 && code <= 99) return '⛈️';
-  return '🌡️';
-}
+import { useState, use } from 'react';
+import Link from 'next/link';
+import { WIDGETS_LIST } from '@/lib/widgets';
+import { LangCode } from '@/lib/i18n';
 
 export default function BuilderPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug: rawSlug } = use(params);
-  const slug = normalizeSlug(rawSlug);
-  const widget = WIDGETS_LIST.find((w) => w.id === slug);
+  const resolvedParams = use(params);
+  const lang: LangCode = 'tr';
+  const slug = resolvedParams.slug;
 
-  const [lang, setLang] = useState<LangCode>("tr");
+  const widget = WIDGETS_LIST.find((w) => w.id === slug) || WIDGETS_LIST[0];
 
-  useEffect(() => {
-    const saved = localStorage.getItem("app_lang") as LangCode;
-    if (saved && TRANSLATIONS[saved]) {
-      setLang(saved);
-    }
-  }, []);
-
-  const handleLangChange = (newLang: LangCode) => {
-    setLang(newLang);
-    localStorage.setItem("app_lang", newLang);
-  };
-
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.tr;
-
-  const initialForm: Record<string, string> = {};
-  if (widget) {
+  const [formState, setFormState] = useState<Record<string, any>>(() => {
+    const initial: Record<string, any> = {};
     widget.fields.forEach((f) => {
-      if (f.defaultValue !== undefined) initialForm[f.name] = String(f.defaultValue);
+      initial[f.name] = f.defaultValue !== undefined ? f.defaultValue : '';
     });
-  }
-
-  
-  const [gpsActive, setGpsActive] = useState(false);
-  const [gpsStatus, setGpsStatus] = useState<string>('Hazır');
-  const [livePos, setLivePos] = useState<{ lat: number; lng: number; speed: number; heading: number }>({
-    lat: 43.5221,
-    lng: 3.9191,
-    speed: 0,
-    heading: 0,
+    return initial;
   });
-  const gpsWatchRef = useRef<number | null>(null);
 
-  const broadcastLocation = (lat: number, lng: number, speed: number, heading: number) => {
-    const ch = (formState.channel || 'itsfatih').toLowerCase().trim();
-    const payload = JSON.stringify({ channel: ch, lat, lng, speed, heading, time: Date.now() });
-
-    fetch(`https://ntfy.sh/sw_gps_${ch}`, { method: 'POST', body: payload }).catch(() => {});
-    fetch('/api/gps', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-    }).catch(() => {});
-  };
-
-  const toggleBuilderGPS = () => {
-    if (gpsActive) {
-      if (gpsWatchRef.current !== null) {
-        navigator.geolocation.clearWatch(gpsWatchRef.current);
-        gpsWatchRef.current = null;
-      }
-      setGpsActive(false);
-      setGpsStatus('Durduruldu');
-      return;
-    }
-
-    if (!navigator.geolocation) {
-      alert('Tarayıcınızda GPS desteği bulunamadı.');
-      return;
-    }
-
-    setGpsStatus('Konum Alınıyor...');
-    setGpsActive(true);
-
-    const onPos = (pos: GeolocationPosition) => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const speed = pos.coords.speed !== null && pos.coords.speed >= 0 ? Math.round(pos.coords.speed * 3.6) : 0;
-      const heading = pos.coords.heading !== null && !isNaN(pos.coords.heading) ? Math.round(pos.coords.heading) : 0;
-
-      setLivePos({ lat, lng, speed, heading });
-      setGpsStatus('Canlı Yayında 🚀');
-      broadcastLocation(lat, lng, speed, heading);
-    };
-
-    const onErr = (err: GeolocationPositionError) => {
-      setGpsStatus('İzin / GPS Hatası');
-      setGpsActive(false);
-    };
-
-    navigator.geolocation.getCurrentPosition(onPos, onErr, { enableHighAccuracy: true, timeout: 15000 });
-    gpsWatchRef.current = navigator.geolocation.watchPosition(onPos, onErr, {
-      enableHighAccuracy: true,
-      timeout: 20000,
-    });
-  };
-
-  const [formState, setFormState] = useState<Record<string, string>>(initialForm);
   const [copied, setCopied] = useState(false);
-  const [liveViewers, setLiveViewers] = useState<number | null>(null);
-  const [currentTime, setCurrentTime] = useState("22:15:37");
 
-  const [autoCity, setAutoCity] = useState<string>("Palavas-les-Flots");
-  const [autoTemp, setAutoTemp] = useState<string>("25°C");
-  const [weatherCode, setWeatherCode] = useState<number>(0);
+  const handleFieldChange = (name: string, value: any) => {
+    setFormState((prev) => ({ ...prev, [name]: value }));
+  };
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleTimeString("tr-TR", {
-          hour12: formState.format === "12",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      );
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [formState.format]);
+  const currentChannel = formState.channel || 'itsfatih';
 
-  useEffect(() => {
-    if (slug !== "irl-hud") return;
-
-    const fetchClientLocation = async () => {
-      try {
-        let lat: number | null = null;
-        let lon: number | null = null;
-        let city = "";
-
-        if (!formState.location || formState.location.toLowerCase() === "auto") {
-          const ipRes = await fetch("https://ipwho.is/");
-          if (ipRes.ok) {
-            const ipData = await ipRes.json();
-            if (ipData?.success) {
-              city = ipData.city || ipData.region || "Canlı Konum";
-              lat = ipData.latitude;
-              lon = ipData.longitude;
-              setAutoCity(city);
-            }
-          }
-        } else {
-          city = formState.location;
-          setAutoCity(city);
-          const geoRes = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=tr&format=json`
-          );
-          if (geoRes.ok) {
-            const geoData = await geoRes.json();
-            if (geoData?.results?.[0]) {
-              lat = geoData.results[0].latitude;
-              lon = geoData.results[0].longitude;
-            }
-          }
-        }
-
-        if (lat !== null && lon !== null) {
-          const wRes = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code`
-          );
-          if (wRes.ok) {
-            const wData = await wRes.json();
-            if (wData?.current) {
-              setAutoTemp(`${Math.round(wData.current.temperature_2m)}°C`);
-              setWeatherCode(wData.current.weather_code);
-            }
-          }
-        }
-      } catch {
-        setAutoCity("Canlı Konum");
-        setAutoTemp("25°C");
-      }
-    };
-
-    fetchClientLocation();
-  }, [slug, formState.location]);
-
-  if (!widget) {
-    return (
-      <div className="min-h-screen bg-[#090b10] text-white flex flex-col items-center justify-center p-6 font-sans">
-        <h1 className="text-2xl font-bold mb-2">Widget Not Found</h1>
-        <Link href="/" className="text-emerald-400 underline text-sm">{t.catalog}</Link>
-      </div>
-    );
-  }
-
-  const widgetName = widget.name[lang] || widget.name.en || widget.name.tr;
-  const widgetDesc = widget.description[lang] || widget.description.en || widget.description.tr;
-
-  const searchParams = new URLSearchParams();
+  // OBS Bağlantı URL'i
+  const queryParams = new URLSearchParams();
   Object.entries(formState).forEach(([key, val]) => {
-    if (val !== undefined && val !== "") searchParams.set(key, val);
+    if (val !== undefined && val !== '') {
+      queryParams.set(key, String(val));
+    }
   });
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-  const queryString = searchParams.toString() ? "?" + searchParams.toString() : "";
-  const finalObsUrl = baseUrl + "/w/" + widget.id + queryString;
-
-
-  useEffect(() => {
-    if (widget.id !== "kick-viewers") return;
-    const ch = (formState.channel || "itsfatih").trim().toLowerCase();
-    
-    const fetchLive = async () => {
-      try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(ch)}&_t=${Date.now()}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.livestream) {
-            setLiveViewers(Number(data.livestream.viewer_count || data.livestream.viewers || 0));
-          } else {
-            setLiveViewers(0);
-          }
-        }
-      } catch (e) {
-        setLiveViewers(null);
-      }
-    };
-
-    fetchLive();
-    const timer = setInterval(fetchLive, 15000);
-    return () => clearInterval(timer);
-  }, [widget.id, formState.channel]);
-
+  const obsUrl = `https://www.streamwidget.live/w/${widget.id}?${queryParams.toString()}`;
+  const gpsTransmitterUrl = `/gps?session=${encodeURIComponent(currentChannel)}`;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(finalObsUrl);
+    navigator.clipboard.writeText(obsUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const scale = Number(formState.scale || 100) / 100;
-  const accent = formState.accent || (slug === "sub-goal" ? "#A970FF" : "#53FC18");
-
   return (
-    <div className="min-h-screen bg-[#090b10] text-slate-100 font-sans relative pb-16">
-      <div className="border-b border-white/5 bg-[#090b10]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition">
-            &larr; {t.catalog}
-          </Link>
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-mono px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
-              {widgetName}
-            </span>
-            <LanguageSelector currentLang={lang} onSelectLang={handleLangChange} />
-          </div>
+    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans select-none">
+      {/* Üst Navigasyon */}
+      <header className="border-b border-white/10 px-8 py-4 flex items-center justify-between">
+        <Link href="/" className="text-xs font-bold text-white/60 hover:text-white flex items-center gap-2">
+          ← Widget Kataloğu
+        </Link>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-black tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full">
+            {widget.name[lang] || widget.name['tr']}
+          </span>
         </div>
+      </header>
+
+      {/* Ana Başlık */}
+      <div className="max-w-6xl w-full mx-auto px-8 pt-8 pb-4">
+        <h1 className="text-3xl font-black tracking-tight text-white">{widget.name[lang] || widget.name['tr']}</h1>
+        <p className="text-sm text-white/50 mt-1">{widget.description[lang] || widget.description['tr']}</p>
       </div>
 
-      <main className="max-w-6xl mx-auto px-6 mt-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">{widgetName}</h1>
-          <p className="text-slate-400 text-sm mt-1">{widgetDesc}</p>
-        </div>
+      {/* Ana Çalışma Alanı */}
+      <main className="max-w-6xl w-full mx-auto px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* Sol Panel: Ayarlar */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="bg-[#0b0e14] border border-white/10 rounded-3xl p-6 space-y-5">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-white/80">AYARLAR</h2>
+            </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-5 space-y-6">
-            <div className="glass-card rounded-2xl p-6 space-y-5 border border-white/5 shadow-2xl">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300 font-mono flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" /> {t.settings}
-              </h2>
+            {/* Dinamik Form Alanları */}
+            <div className="space-y-4">
+              {widget.fields.map((field) => (
+                <div key={field.name} className="space-y-1.5">
+                  <label className="text-xs font-bold text-white/60">
+                    {field.label[lang] || field.label['tr']}
+                  </label>
 
-              {widget.fields.map((f) => {
-                const fieldLabel = f.label[lang] || f.label.en || f.label.tr;
-                return (
-                  <div key={f.name} className="space-y-2">
-                    <label className="text-xs font-semibold text-slate-300 flex justify-between">
-                      <span>{fieldLabel}</span>
-                    </label>
-                    {(f.type === "text" || f.type === "number") && (
+                  {field.type === 'text' && (
+                    <input
+                      type="text"
+                      value={formState[field.name] || ''}
+                      onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                      placeholder={field.placeholder}
+                      className="w-full bg-[#07090e] border border-white/15 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-emerald-400"
+                    />
+                  )}
+
+                  {field.type === 'select' && (
+                    <select
+                      value={formState[field.name] || ''}
+                      onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                      className="w-full bg-[#07090e] border border-white/15 rounded-xl px-4 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-emerald-400"
+                    >
+                      {field.options?.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label[lang] || opt.label['tr']}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {field.type === 'color' && (
+                    <div className="flex items-center gap-3 bg-[#07090e] border border-white/15 rounded-xl p-2">
                       <input
-                        type={f.type}
-                        placeholder={f.placeholder}
-                        value={formState[f.name] ?? ""}
-                        onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
-                        className="w-full bg-[#12161f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 transition"
+                        type="color"
+                        value={formState[field.name] || '#53FC18'}
+                        onChange={(e) => handleFieldChange(field.name, e.target.value)}
+                        className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
                       />
-                    )}
-                    {f.type === "color" && (
-                      <div className="flex items-center gap-3 bg-[#12161f] border border-white/10 rounded-xl p-2">
-                        <input
-                          type="color"
-                          value={formState[f.name] || (f.defaultValue as string)}
-                          onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
-                          className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-0"
-                        />
-                        <span className="text-xs font-mono uppercase text-slate-300">{formState[f.name] || f.defaultValue}</span>
-                      </div>
-                    )}
-                    {f.type === "select" && (
-                      <select
-                        value={formState[f.name] || (f.defaultValue as string)}
-                        onChange={(e) => setFormState({ ...formState, [f.name]: e.target.value })}
-                        className="w-full bg-[#12161f] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-emerald-400 transition"
-                      >
-                        {f.options?.map((opt) => {
-                          const optLabel = opt.label[lang] || opt.label.en || opt.label.tr;
-                          return (
-                            <option key={opt.value} value={opt.value}>
-                              {optLabel}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    )}
-                  </div>
-                );
-              })}
+                      <span className="text-xs font-mono font-bold text-white/80 uppercase">
+                        {formState[field.name] || '#53FC18'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
-            <div className="glass-card rounded-2xl p-6 space-y-4 border border-white/5">
-              <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-slate-400">{t.obsLink}</h3>
-              <div className="bg-[#0c0f16] border border-white/10 rounded-xl p-3.5 text-xs font-mono text-emerald-400 break-all select-all">
-                {finalObsUrl}
+            {/* GPS Mini-Map İçin Özel Session Başlatma Buton Alanı */}
+            {widget.id === 'mini-map' && (
+              <div className="pt-3 border-t border-white/10 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-emerald-400">Canlı GPS Vericisi</span>
+                  <span className="text-white/40 text-[11px]">Mobil & Web</span>
+                </div>
+                <a
+                  href={gpsTransmitterUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-3.5 px-4 rounded-xl bg-emerald-500 text-black font-black text-xs uppercase tracking-wider hover:bg-emerald-400 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 text-center"
+                >
+                  📍 KONUM BAŞLATICI SAYFASINA GİT ↗
+                </a>
               </div>
-              <button
-                onClick={handleCopy}
-                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-bold text-sm transition-all transform active:scale-[0.98] shadow-lg shadow-emerald-500/20"
-              >
-                {copied ? t.copied : t.copyLink}
-              </button>
-            </div>
+            )}
           </div>
 
-          <div className="lg:col-span-7">
-            <div className="glass-card rounded-2xl p-6 border border-white/5 h-full flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs font-bold font-mono uppercase tracking-wider text-slate-400">{t.livePreview}</h3>
-                  <span className="text-[11px] font-mono text-slate-500">Live Simulator</span>
-                </div>
-                
-                <div className="w-full h-80 rounded-xl bg-[#0e121a] border border-white/10 relative overflow-hidden flex items-center justify-center p-6 bg-grid-pattern shadow-inner">
-                  <div className="absolute top-3 left-3 text-[10px] font-mono text-slate-600 uppercase">{t.previewArea}</div>
-                  
-                  <div style={{ transform: `scale(${scale})`, transition: "transform 0.2s ease" }}>
-                    {widget.id === "events" && (
-  <div className="flex flex-col gap-2 w-72 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl">
-    <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-white/10">
-      <span className="font-bold text-neutral-300 uppercase">{formState.channel || "itsfatih"}</span>
-      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase" style={{ backgroundColor: accent + "20", color: accent }}>Canlı</span>
-    </div>
-    <div className="flex items-center justify-between text-xs py-1">
-      <span className="text-slate-400">Son Takip</span>
-      <span className="font-bold" style={{ color: accent }}>ahmet_kaya</span>
-    </div>
-    <div className="flex items-center justify-between text-xs py-1">
-      <span className="text-slate-400">Son Abone</span>
-      <span className="font-bold text-purple-400">can_demir</span>
-    </div>
-  </div>
-)}
+          {/* OBS Bağlantı Kutusu */}
+          <div className="bg-[#0b0e14] border border-white/10 rounded-3xl p-6 space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">OBS BROWSER BAĞLANTISI</h3>
+            <div className="bg-[#07090e] border border-white/10 rounded-xl p-3 text-xs font-mono text-emerald-400 break-all select-all">
+              {obsUrl}
+            </div>
+            <button
+              onClick={handleCopy}
+              className={`w-full py-3.5 rounded-xl font-black text-sm tracking-wide transition-all ${
+                copied
+                  ? 'bg-white text-black'
+                  : 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-lg shadow-emerald-500/20'
+              }`}
+            >
+              {copied ? '✓ KOPYALANDI!' : 'OBS Linkini Kopyala'}
+            </button>
+          </div>
+        </div>
 
-                    {widget.id === "kick-viewers" && (
-                      <div className="flex items-center gap-3 bg-black/85 backdrop-blur-xl px-5 py-2.5 rounded-2xl border text-white shadow-2xl" style={{ borderColor: `${accent}50` }}>
-                        <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: accent }} />
-                        <span className="text-xs font-mono font-bold text-neutral-300 uppercase">{formState.channel || "itsfatih"}</span>
-                        <span className="text-sm font-black font-mono" style={{ color: accent }}>{liveViewers !== null ? liveViewers.toLocaleString("tr-TR") : (formState.channel ? "0" : "148")}</span>
-                      </div>
-                    )}
+        {/* Sağ Panel: Canlı Önizleme */}
+        <div className="lg:col-span-7 space-y-4">
+          <div className="bg-[#0b0e14] border border-white/10 rounded-3xl p-6 min-h-[440px] flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-white/60">CANLI ÖNİZLEME</span>
+              <span className="text-xs font-mono text-white/40">Live Simulator</span>
+            </div>
 
-                    {widget.id === "follower-goal" && (
-                      <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
-                        <div className="flex justify-between items-center text-xs font-bold font-mono">
-                          <span className="text-neutral-200">{formState.title || "FOLLOWER GOAL"}</span>
-                          <span style={{ color: accent }} className="text-sm font-black">340 / {formState.target || 500}</span>
-                        </div>
-                        <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-[1px]">
-                          <div 
-                            className="h-full rounded-full transition-all duration-500 shadow-sm" 
-                            style={{ width: `68%`, backgroundColor: accent, boxShadow: `0 0 10px ${accent}80` }} 
-                          />
-                        </div>
-                        <div className="flex justify-between text-[10px] font-mono text-neutral-400">
-                          <span>%68</span>
-                          <span>160</span>
-                        </div>
-                      </div>
-                    )}
+            {/* Radar Mini-Map Canlı Önizleme */}
+            <div className="flex-1 flex items-center justify-center py-6">
+              {widget.id === 'mini-map' ? (
+                <div
+                  className={`relative ${
+                    formState.shape === 'square' ? 'w-64 h-64 rounded-3xl' : 'w-64 h-64 rounded-full'
+                  } border-[3px] shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300`}
+                  style={{
+                    borderColor: formState.accent || '#53FC18',
+                    backgroundColor: '#090b10',
+                    boxShadow: `0 0 35px ${formState.accent || '#53FC18'}40`,
+                  }}
+                >
+                  <div
+                    className="absolute inset-0 bg-cover bg-center opacity-70"
+                    style={{
+                      backgroundImage: `url('https://a.basemaps.cartocdn.com/dark_all/16/33947/23019.png')`,
+                      transform: 'scale(1.3)',
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-[radial-gradient(#ffffff15_1px,transparent_1px)] [background-size:14px_14px]" />
+                  <div className="absolute inset-0 rounded-full border border-dashed border-white/20" />
 
-                    {widget.id === "sub-goal" && (
-                      <div className="w-80 bg-black/85 backdrop-blur-xl p-4 rounded-2xl border border-white/10 text-white shadow-2xl space-y-2">
-                        <div className="flex justify-between items-center text-xs font-bold font-mono">
-                          <span className="text-neutral-200">{formState.title || "SUB GOAL"}</span>
-                          <span style={{ color: accent }} className="text-sm font-black">
-                            {formState.current || 0} / {formState.target || 25}
-                          </span>
-                        </div>
-                        <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden p-[1px]">
-                          <div 
-                            className="h-full rounded-full transition-all duration-500 shadow-sm" 
-                            style={{ 
-                              width: `${Math.min(100, (Number(formState.current || 0) / Number(formState.target || 25)) * 100)}%`, 
-                              backgroundColor: accent, 
-                              boxShadow: `0 0 10px ${accent}80` 
-                            }} 
-                          />
-                        </div>
-                        <div className="flex justify-between text-[10px] font-mono text-neutral-400">
-                          <span>%{Math.round(Math.min(100, (Number(formState.current || 0) / Number(formState.target || 25)) * 100))}</span>
-                          <span>Live Sub Goal</span>
-                        </div>
-                      </div>
-                    )}
+                  {/* Oyuncu Oku */}
+                  <div className="relative flex flex-col items-center">
+                    <div
+                      className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[18px]"
+                      style={{
+                        borderBottomColor: formState.accent || '#53FC18',
+                        filter: `drop-shadow(0 0 8px ${formState.accent || '#53FC18'})`,
+                      }}
+                    />
+                    <div className="w-2.5 h-2.5 rounded-full bg-white -mt-1 shadow-md border border-black" />
+                  </div>
 
-                    {widget.id === "irl-hud" && (
-                      <div className="inline-flex items-center gap-3.5 bg-black/85 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 text-white shadow-2xl text-xs font-semibold">
-                        {formState.showLive !== "false" && (
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                            <span className="text-[11px] font-black tracking-widest text-red-400">LIVE</span>
-                          </div>
-                        )}
-                        
-                        {formState.showClock !== "false" && (
-                          <>
-                            {formState.showLive !== "false" && <div className="h-4 w-[1px] bg-white/20" />}
-                            <span className="font-mono tracking-wide text-slate-100">{currentTime}</span>
-                          </>
-                        )}
+                  {/* Hız */}
+                  <div className="absolute bottom-3 bg-black/90 backdrop-blur-md px-3 py-1 rounded-xl border border-white/20 flex items-baseline gap-1 shadow-lg">
+                    <span className="text-sm font-black font-mono text-white">0</span>
+                    <span className="text-[9px] font-bold text-white/50">KM/H</span>
+                  </div>
 
-                        {formState.showLocation !== "false" && (
-                          <>
-                            {(formState.showLive !== "false" || formState.showClock !== "false") && (
-                              <div className="h-4 w-[1px] bg-white/20" />
-                            )}
-                            <span className="flex items-center gap-1.5 text-slate-300 font-medium">
-                              <span className="text-emerald-400 text-sm">📍</span>
-                              <span>{autoCity}</span>
-                            </span>
-                          </>
-                        )}
-
-                        {formState.showWeather !== "false" && (
-                          <>
-                            {(formState.showLive !== "false" || formState.showClock !== "false" || formState.showLocation !== "false") && (
-                              <div className="h-4 w-[1px] bg-white/20" />
-                            )}
-                            <span className="flex items-center gap-1.5 text-amber-300 font-mono font-bold">
-                              <span>{getWeatherIcon(weatherCode)}</span>
-                              <span>{autoTemp}</span>
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {widget.id === "kick-chat" && (
-                      <div className="w-72 bg-black/75 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 text-white text-xs space-y-2">
-                        <div className="flex items-center gap-1.5 font-bold text-emerald-400">
-                          <span>moderator:</span>
-                          <span className="text-slate-200 font-normal">Awesome stream! 🔥</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {widget.id === "clock" && (
-                      <div className="bg-black/85 backdrop-blur-xl px-7 py-3 rounded-2xl border border-white/10 text-white shadow-2xl">
-                        <span className="text-2xl font-black font-mono tracking-wider">{currentTime}</span>
-                      </div>
-                    )}
+                  {/* Durum */}
+                  <div className="absolute top-3 bg-black/80 backdrop-blur-sm px-2.5 py-0.5 rounded-full border border-white/15 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    <span className="text-[9px] font-black text-white/90 uppercase tracking-wider">RADAR LIVE</span>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="text-xs font-mono text-white/30 uppercase">Önizleme Alanı</div>
+              )}
+            </div>
 
-              <div className="mt-6 p-4 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-400 flex items-center justify-between">
-                <span>{widget.id === "irl-hud" ? t.hintHud : (widget.id.includes("goal") ? t.hintGoal : t.hintGeneral)}</span>
-              </div>
+            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-[11px] text-white/40 flex items-center gap-2">
+              💡 Soldaki ayarlarla oynadıkça önizleme ve bağlantı linki anlık olarak güncellenir.
             </div>
           </div>
         </div>
+
       </main>
     </div>
   );
 }
-
-
