@@ -236,12 +236,7 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     username: string;
     content: string;
     color?: string;
-  } | null>({
-    id: 'demo-1',
-    username: 'Moderatör',
-    content: '🎉 Yayına hoş geldiniz! Çekiliş için chate !katil yazabilirsiniz.',
-    color: accent,
-  });
+  } | null>(null);
 
   const playPingSound = () => {
     try {
