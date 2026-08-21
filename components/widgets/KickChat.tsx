@@ -7,21 +7,14 @@ interface ChatMessage {
   user: string;
   content: string;
   color: string;
+  badges?: string[];
 }
-
-// Bilinen yayıncıların anında bağlanması için hızlı önbellek
-const CHANNEL_CHATROOM_MAP: Record<string, string> = {
-  itsfatih: '1917711',
-  batuhankaradeniz: '2437618',
-  elraenn: '2437618',
-  kendinemuzisyen: '2437618',
-};
 
 export default function KickChatWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
   const theme = searchParams.theme || 'botrix';
-  const fontSize = searchParams.fontSize || 'medium';
-  const textStroke = searchParams.textStroke || 'thin';
+  const fontSize = searchParams.fontSize || 'small';
+  const textStroke = searchParams.textStroke || 'none';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,8 +25,9 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     let isCancelled = false;
 
     const startChat = async () => {
-      let chatroomId = CHANNEL_CHATROOM_MAP[channel] || '1917711';
+      let chatroomId = '1917711';
 
+      // 1. Chatroom ID al
       try {
         const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (res.ok) {
@@ -44,58 +38,56 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
         }
       } catch (e) {}
 
+      // Özel kanal eşleştirmeleri (Fallback)
+      if (channel === 'batuhankaradeniz') chatroomId = '2437618';
+      if (channel === 'itsfatih') chatroomId = '1917711';
+
       if (isCancelled) return;
 
-      // 2 gün önce çalışan resmi Kick Pusher Soketi
-      ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
+      // 2. Corard / Botrix'in kullandığı resmi Kick Pusher App Key: 32cbd69e4b950bf97679
+      ws = new WebSocket(
+        'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0-rc2&flash=false'
+      );
 
-      const subscribeToRooms = () => {
-        // Hem v2 hem v1 ve chatroom kanallarına aynı anda abone ol (garanti yakalama)
-        const channelsToSub = [
-          `chatrooms.${chatroomId}.v2`,
-          `chatrooms.${chatroomId}`,
-          `chatroom_${chatroomId}`
-        ];
-
-        channelsToSub.forEach((ch) => {
-          ws?.send(
-            JSON.stringify({
-              event: 'pusher:subscribe',
-              data: { auth: '', channel: ch }
-            })
-          );
-        });
+      const subscribe = () => {
+        ws?.send(
+          JSON.stringify({
+            event: 'pusher:subscribe',
+            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
+          })
+        );
       };
 
       ws.onopen = () => {
-        subscribeToRooms();
+        subscribe();
       };
 
       ws.onmessage = (event) => {
         try {
-          const parsed = JSON.parse(event.data);
+          const payload = JSON.parse(event.data);
 
-          if (parsed.event === 'pusher:connection_established') {
-            subscribeToRooms();
+          if (payload.event === 'pusher:connection_established') {
+            subscribe();
           }
 
-          if (parsed.event && (parsed.event.includes('ChatMessageEvent') || parsed.event.includes('Message'))) {
-            let msgData = parsed.data;
-            if (typeof msgData === 'string') {
-              msgData = JSON.parse(msgData);
+          if (payload.event && payload.event.includes('ChatMessageEvent')) {
+            let data = payload.data;
+            if (typeof data === 'string') {
+              data = JSON.parse(data);
             }
 
-            const sender = msgData.sender || {};
+            const sender = data.sender || {};
             const identity = sender.identity || {};
 
             const newMsg: ChatMessage = {
-              id: String(msgData.id || Date.now() + Math.random()),
+              id: String(data.id || Date.now() + Math.random()),
               user: sender.username || 'Kullanıcı',
-              content: msgData.content || '',
+              content: data.content || '',
               color: identity.color || '#53FC18',
+              badges: identity.badges?.map((b: any) => b.type) || [],
             };
 
-            setMessages((prev) => [...prev.slice(-35), newMsg]);
+            setMessages((prev) => [...prev.slice(-40), newMsg]);
           }
         } catch (err) {}
       };
@@ -124,10 +116,10 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
 
   const sizeStyles =
     fontSize === 'small'
-      ? 'text-[11px] py-1.5 px-3'
+      ? 'text-[11px] py-1 px-2.5'
       : fontSize === 'large'
-      ? 'text-[15px] py-3 px-4'
-      : 'text-xs py-2 px-3.5';
+      ? 'text-[15px] py-2.5 px-4'
+      : 'text-xs py-1.5 px-3';
 
   const strokeStyle =
     textStroke === 'thick'
@@ -201,7 +193,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     <div className="w-screen h-screen flex flex-col justify-end p-6 bg-transparent select-none font-sans overflow-hidden">
       <div
         ref={containerRef}
-        className="flex flex-col space-y-2.5 max-h-[90vh] overflow-y-auto scrollbar-none pr-2 max-w-md"
+        className="flex flex-col space-y-2 max-h-[90vh] overflow-y-auto scrollbar-none pr-2 max-w-md"
       >
         {messages.map((m) => renderCard(m))}
       </div>
