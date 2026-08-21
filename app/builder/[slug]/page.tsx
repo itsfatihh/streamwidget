@@ -17,7 +17,6 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
   const [lang, setLang] = useState<'tr' | 'en' | 'es' | 'de' | 'pt' | 'fr' | 'ru'>('tr');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
-  // Tarayıcıdan dil ve tema tercihini yükle
   useEffect(() => {
     const savedLang = localStorage.getItem('sw_lang') as any;
     if (savedLang) setLang(savedLang);
@@ -54,9 +53,10 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
   const queryParams = new URLSearchParams(config).toString();
   const widgetUrl = `https://www.streamwidget.live/w/${widget.id}${queryParams ? `?${queryParams}` : ''}`;
   const previewUrl = `/w/${widget.id}${queryParams ? `?${queryParams}` : ''}`;
+  const phoneGpsUrl = `https://www.streamwidget.live/gps?channel=${encodeURIComponent(config.channel || 'itsfatih')}`;
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(widgetUrl);
+  const copyToClipboard = (url: string) => {
+    navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -69,13 +69,12 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
     obsLink: { tr: 'OBS Tarayıcı Kaynağı Linki', en: 'OBS Browser Source URL', es: 'Enlace de Fuente del Navegador OBS', de: 'OBS-Browserquellen-Link', pt: 'Link de Fonte do Navegador OBS', fr: 'Lien de Source de Navigateur OBS', ru: 'Ссылка на источник браузера OBS' },
     copy: { tr: 'Linki Kopyala', en: 'Copy URL', es: 'Copiar Enlace', de: 'Link kopieren', pt: 'Copiar Link', fr: 'Copier le Lien', ru: 'Копировать' },
     copied: { tr: 'Kopyalandı!', en: 'Copied!', es: '¡Copiado!', de: 'Kopiert!', pt: 'Copiado!', fr: 'Copié !', ru: 'Скопировано!' },
-    commandsTitle: { tr: 'Kick Chat Komutları (Yayıncı & Mod)', en: 'Kick Chat Commands (Broadcaster & Mod)', es: 'Comandos de Kick Chat (Emisor y Mod)', de: 'Kick-Chat-Befehle (Streamer & Mod)', pt: 'Comandos do Kick Chat (Streamer & Mod)', fr: 'Commandes de Chat Kick (Streamer & Mod)', ru: 'Команды Kick чата (Стример и Мод)' },
   };
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-[#07090e] text-white' : 'bg-slate-50 text-slate-900'} p-4 md:p-8 flex flex-col items-center justify-start font-sans`}>
       
-      {/* Üst Bar: Navigasyon, Dil ve Tema Seçici */}
+      {/* Üst Navigasyon */}
       <div className="w-full max-w-6xl flex items-center justify-between mb-8 pb-4 border-b border-black/10 dark:border-white/10">
         <Link
           href="/"
@@ -85,7 +84,6 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
         </Link>
 
         <div className="flex items-center gap-3">
-          {/* Dil Seçici */}
           <select
             value={lang}
             onChange={(e) => handleLangChange(e.target.value)}
@@ -102,7 +100,6 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
             <option value="ru">🇷🇺 Русский</option>
           </select>
 
-          {/* Tema Değiştirici */}
           <button
             onClick={toggleTheme}
             className={`p-2 rounded-lg border transition-all text-xs flex items-center justify-center ${
@@ -196,7 +193,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
                 }`}
               />
               <button
-                onClick={copyToClipboard}
+                onClick={() => copyToClipboard(widgetUrl)}
                 className="shrink-0 bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
               >
                 {copied ? (t.copied[lang] || t.copied.en) : (t.copy[lang] || t.copy.en)}
@@ -205,7 +202,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
           </div>
         </div>
 
-        {/* Sağ Panel: Canlı Önizleme ve Chat Komutları */}
+        {/* Sağ Panel: Canlı Önizleme */}
         <div className={`lg:col-span-7 border rounded-2xl p-6 shadow-2xl flex flex-col transition-colors ${
           isDark ? 'bg-[#0b0e14] border-white/10' : 'bg-white border-slate-200 shadow-slate-200/50'
         }`}>
@@ -216,16 +213,51 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
           </div>
 
-          {/* Iframe Önizleme Alanı */}
-          <div className={`w-full h-[220px] rounded-xl border overflow-hidden flex items-center justify-center relative ${
+          {/* Iframe Önizleme Kutusu (Ortalanmış ve Ferah) */}
+          <div className={`w-full min-h-[320px] rounded-xl border overflow-hidden flex items-center justify-center relative ${
             isDark ? 'bg-black/60 border-white/5' : 'bg-slate-900 border-slate-800'
           }`}>
             <iframe
               src={previewUrl}
-              className="w-full h-full border-0 pointer-events-none bg-transparent"
+              className="w-full h-[320px] border-0 pointer-events-none bg-transparent"
               title="Widget Preview"
             />
           </div>
+
+          {/* Mini Harita Telefon GPS Rehber Kartı */}
+          {slug === 'mini-map' && (
+            <div className={`w-full mt-5 p-4 rounded-xl border text-left ${
+              isDark ? 'bg-[#121622] border-white/10' : 'bg-slate-50 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/90' : 'text-slate-800'}`}>
+                  {lang === 'tr' ? 'Telefon Canlı GPS Bağlantısı' : 'Mobile Live GPS Pairing'}
+                </h4>
+              </div>
+              <p className={`text-xs leading-relaxed mb-3 ${isDark ? 'text-white/60' : 'text-slate-600'}`}>
+                {lang === 'tr'
+                  ? 'IRL yayını sırasında anlık konum ve hızınızı haritaya yansıtmak için bu linki yayında kullandığınız telefondan açın:'
+                  : 'Open this link on your streaming phone to broadcast your real-time GPS location and speed:'}
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={phoneGpsUrl}
+                  className={`w-full border rounded-xl px-3 py-1.5 text-xs font-mono focus:outline-none select-all ${
+                    isDark ? 'bg-black/50 border-white/10 text-cyan-400' : 'bg-white border-slate-300 text-cyan-600'
+                  }`}
+                />
+                <button
+                  onClick={() => copyToClipboard(phoneGpsUrl)}
+                  className="shrink-0 bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-3 py-1.5 rounded-xl text-xs transition-all shadow-md active:scale-95"
+                >
+                  {lang === 'tr' ? 'GPS Linkini Kopyala' : 'Copy GPS Link'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* IRL HUD Chat Komutları Tablosu */}
           {slug === 'irl-hud' && (
@@ -235,7 +267,7 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
               <div className="flex items-center gap-2 mb-3">
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                 <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/90' : 'text-slate-800'}`}>
-                  {t.commandsTitle[lang] || t.commandsTitle.en}
+                  Kick Chat Komutları (Yayıncı & Mod)
                 </h4>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs font-mono">

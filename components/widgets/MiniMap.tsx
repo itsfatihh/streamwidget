@@ -20,13 +20,11 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
   const [locationName, setLocationName] = useState<string>('GPS Aranıyor...');
   const [gpsSource, setGpsSource] = useState<'LIVE GPS' | 'IP NET'>('IP NET');
 
-  // 1. Canlı GPS ve IP Konum Çözücü Motoru
   useEffect(() => {
     let isCancelled = false;
 
     const fetchGpsLocation = async () => {
       try {
-        // A. Önce yayıncının telefonundan /api/gps'e gelen canlı veriyi dene
         const gpsRes = await fetch(`/api/gps?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (gpsRes.ok) {
           const gpsData = await gpsRes.json();
@@ -41,7 +39,6 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
           }
         }
 
-        // B. Canlı telefon GPS verisi yoksa tarayıcı IP'sinden konumu çek
         if (!coords) {
           const ipRes = await fetch('https://ipwho.is/');
           if (ipRes.ok) {
@@ -54,7 +51,6 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
           }
         }
       } catch (err) {
-        // Hata durumunda varsayılan koordinata geç
         if (!coords && !isCancelled) {
           setCoords({ lat: 41.0082, lon: 28.9784 });
           setLocationName('İstanbul');
@@ -63,7 +59,7 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
     };
 
     fetchGpsLocation();
-    const interval = setInterval(fetchGpsLocation, 4000); // 4 saniyede bir canlı konumu tazele
+    const interval = setInterval(fetchGpsLocation, 4000);
 
     return () => {
       isCancelled = true;
@@ -74,16 +70,15 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
   const lat = coords?.lat ?? 41.0082;
   const lon = coords?.lon ?? 28.9784;
 
-  // OpenStreetMap Bounding Box Hesaplayıcı (Zoom seviyesine göre)
   const delta = zoom >= 17 ? 0.0035 : zoom >= 15 ? 0.0075 : 0.018;
   const bbox = `${lon - delta},${lat - delta},${lon + delta},${lat + delta}`;
   const mapEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lon}`;
 
   return (
-    <div className="w-screen h-screen flex items-start justify-start p-6 bg-transparent select-none font-sans">
+    <div className="w-screen h-screen flex items-center justify-center p-4 bg-transparent select-none font-sans">
       <div
         className={`relative overflow-hidden shadow-[0_12px_40px_rgba(0,0,0,0.85)] border-2 transition-all duration-300 ${
-          shape === 'circle' ? 'w-64 h-64 rounded-full' : 'w-72 h-60 rounded-3xl'
+          shape === 'circle' ? 'w-60 h-60 rounded-full' : 'w-72 h-56 rounded-3xl'
         } ${
           mapTheme === 'dark'
             ? 'border-emerald-500/40 bg-[#090d14]'
@@ -92,7 +87,7 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
             : 'border-white/30 bg-slate-100'
         }`}
       >
-        {/* Harita Iframe Katmanı */}
+        {/* Harita Katmanı */}
         <div
           className={`w-full h-full relative transition-all duration-500 ${
             mapTheme === 'dark'
@@ -104,13 +99,13 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
         >
           <iframe
             src={mapEmbedUrl}
-            className="w-[140%] h-[140%] -top-[20%] -left-[20%] absolute border-0 pointer-events-none"
+            className="w-[150%] h-[150%] -top-[25%] -left-[25%] absolute border-0 pointer-events-none"
             scrolling="no"
             title="Mini Map"
           />
         </div>
 
-        {/* Radar Tarama Efekti & Grid (Karanlık Temalarda) */}
+        {/* Radar Izgara Efekti */}
         {(mapTheme === 'dark' || mapTheme === 'midnight') && (
           <>
             <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,rgba(0,0,0,0.6)_100%)] pointer-events-none" />
@@ -120,15 +115,15 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
           </>
         )}
 
-        {/* Merkez Oyuncu/Yayıncı Radar Pini */}
+        {/* Merkez Oyuncu Pini */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <div className="relative flex items-center justify-center">
-            <span className="w-5 h-5 rounded-full bg-emerald-400/30 animate-ping absolute" />
+            <span className="w-6 h-6 rounded-full bg-emerald-400/30 animate-ping absolute" />
             <span className="w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-white shadow-[0_0_12px_rgba(52,211,153,1)] z-10" />
           </div>
         </div>
 
-        {/* Üst Bilgi Barı (Canlı Konum Rozeti) */}
+        {/* Üst Konum Rozeti */}
         <div className="absolute top-2.5 inset-x-0 flex justify-center items-center pointer-events-none z-20 px-4">
           <div className="bg-[#0b0e14]/90 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 shadow-lg">
             <span
@@ -142,10 +137,10 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
           </div>
         </div>
 
-        {/* Alt Bilgi Barı: Hız Göstergesi */}
+        {/* Alt Hız Göstergesi */}
         {showSpeed && (
           <div className="absolute bottom-2.5 inset-x-0 flex justify-center items-center pointer-events-none z-20">
-            <div className="bg-[#0b0e14]/95 backdrop-blur-md px-3.5 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-lg">
+            <div className="bg-[#0b0e14]/95 backdrop-blur-md px-3 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1.5 shadow-lg">
               <span className="text-xs font-mono font-black text-emerald-400">{speed}</span>
               <span className="text-[9px] font-bold text-white/60 tracking-wider">KM/H</span>
             </div>
