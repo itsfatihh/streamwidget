@@ -1,49 +1,52 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-// Oturum bazlı bellek içi GPS saklama (In-memory cache)
-const gpsStore = new Map<string, {
-  lat: number;
-  lng: number;
-  speed: number;
-  heading: number;
-  timestamp: number;
-}>();
+// Global bellek deposu
+declare global {
+  var __STREAMWIDGET_GPS_STORE__: Record<string, { lat: number; lng: number; speed: number; heading: number; updatedAt: number }> | undefined;
+}
 
-export async function POST(request: NextRequest) {
+if (!global.__STREAMWIDGET_GPS_STORE__) {
+  global.__STREAMWIDGET_GPS_STORE__ = {};
+}
+
+const store = global.__STREAMWIDGET_GPS_STORE__;
+
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
-    const { session, lat, lng, speed = 0, heading = 0 } = body;
+    const body = await req.json();
+    const key = (body.channel || body.session || 'itsfatih').toLowerCase().trim();
 
-    if (!session || lat === undefined || lng === undefined) {
-      return NextResponse.json({ error: 'Eksik veri' }, { status: 400 });
-    }
+    store[key] = {
+      lat: Number(body.lat || body.latitude || 0),
+      lng: Number(body.lng || body.longitude || 0),
+      speed: Number(body.speed || 0),
+      heading: Number(body.heading || 0),
+      updatedAt: Date.now(),
+    };
 
-    gpsStore.set(session.toLowerCase().trim(), {
-      lat: Number(lat),
-      lng: Number(lng),
-      speed: Number(speed),
-      heading: Number(heading),
-      timestamp: Date.now(),
-    });
-
-    return NextResponse.json({ success: true });
-  } catch (e) {
-    return NextResponse.json({ error: 'Geçersiz veri' }, { status: 500 });
+    return NextResponse.json({ success: true, key, data: store[key] });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 400 });
   }
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const session = searchParams.get('session');
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const key = (searchParams.get('channel') || searchParams.get('session') || 'itsfatih').toLowerCase().trim();
 
-  if (!session) {
-    return NextResponse.json({ error: 'Session gerekli' }, { status: 400 });
-  }
-
-  const data = gpsStore.get(session.toLowerCase().trim());
+  const data = store[key];
   if (!data) {
-    return NextResponse.json({ active: false });
+    return NextResponse.json({
+      lat: 49.4875,
+      lng: 8.4660,
+      speed: 0,
+      heading: 0,
+      status: 'waiting',
+    });
   }
 
-  return NextResponse.json({ active: true, ...data });
+  return NextResponse.json({
+    ...data,
+    status: Date.now() - data.updatedAt < 10000 ? 'live' : 'stale',
+  });
 }
