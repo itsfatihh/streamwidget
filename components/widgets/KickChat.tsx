@@ -17,81 +17,44 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const seenIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let pingTimer: any = null;
     let isCancelled = false;
 
-    const startPusherChat = async () => {
-      let chatroomId = '1917711';
-
-      // 1. Chatroom ID al
+    const fetchChatMessages = async () => {
       try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`);
+        const res = await fetch(`/api/kick-chat?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          if (data?.chatroom_id) chatroomId = String(data.chatroom_id);
+          if (data.success && Array.isArray(data.messages)) {
+            const incoming: ChatMessage[] = data.messages;
+            
+            setMessages((prev) => {
+              const updated = [...prev];
+              let hasNew = false;
+
+              incoming.forEach((msg) => {
+                if (!seenIds.current.has(msg.id)) {
+                  seenIds.current.add(msg.id);
+                  updated.push(msg);
+                  hasNew = true;
+                }
+              });
+
+              return hasNew ? updated.slice(-30) : prev;
+            });
+          }
         }
       } catch (e) {}
-
-      if (isCancelled) return;
-
-      // 2. Pusher Protokolü ile Doğrudan Bağlan
-      ws = new WebSocket(
-        'wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=8.4.0-rc2&flash=false'
-      );
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          // Pusher bağlantı onaylandığında kanala abone ol
-          if (data.event === 'pusher:connection_established') {
-            ws?.send(
-              JSON.stringify({
-                event: 'pusher:subscribe',
-                data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
-              })
-            );
-          }
-
-          // Canlı mesaj yakalama
-          if (
-            data.event === 'App\\Events\\ChatMessageEvent' ||
-            data.event === 'ChatMessageEvent' ||
-            (data.event && data.event.includes('ChatMessageEvent'))
-          ) {
-            const rawMsg = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
-            const sender = rawMsg.sender || {};
-            const identity = sender.identity || {};
-
-            const newMsg: ChatMessage = {
-              id: String(rawMsg.id || Date.now() + Math.random()),
-              user: sender.username || 'Kullanıcı',
-              content: rawMsg.content || '',
-              color: identity.color || '#53FC18',
-            };
-
-            setMessages((prev) => [...prev.slice(-35), newMsg]);
-          }
-        } catch (err) {}
-      };
-
-      // 15 saniyede bir Pusher ping
-      pingTimer = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
-        }
-      }, 15000);
     };
 
-    startPusherChat();
+    fetchChatMessages();
+    const interval = setInterval(fetchChatMessages, 1200);
 
     return () => {
       isCancelled = true;
-      if (ws) ws.close();
-      if (pingTimer) clearInterval(pingTimer);
+      clearInterval(interval);
     };
   }, [channel]);
 
@@ -115,7 +78,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       ? { textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.9)' }
       : {};
 
-  const renderCardTheme = (msg: ChatMessage) => {
+  const renderCard = (msg: ChatMessage) => {
     if (theme === 'minimal') {
       return (
         <div key={msg.id} className={`animate-in fade-in slide-in-from-bottom-2 duration-200 ${sizeStyles}`} style={strokeStyle}>
@@ -131,7 +94,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       return (
         <div
           key={msg.id}
-          className={`bg-[#121622]/85 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5 ${sizeStyles}`}
+          className={`bg-[#121622]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5 ${sizeStyles}`}
           style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.35)', ...strokeStyle }}
         >
           <span className="font-black text-[11px] uppercase tracking-wide" style={{ color: msg.color }}>
@@ -157,6 +120,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       );
     }
 
+    // Default BotRix Kartı
     return (
       <div
         key={msg.id}
@@ -181,7 +145,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
         ref={containerRef}
         className="flex flex-col space-y-2.5 max-h-[90vh] overflow-y-auto scrollbar-none pr-2 max-w-md"
       >
-        {messages.map((m) => renderCardTheme(m))}
+        {messages.map((m) => renderCard(m))}
       </div>
     </div>
   );
