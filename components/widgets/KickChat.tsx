@@ -1,53 +1,192 @@
 'use client';
 
+import { useState, useEffect, useRef } from 'react';
+
+interface ChatMessage {
+  id: string;
+  user: string;
+  content: string;
+  color: string;
+  badges?: string[];
+  createdAt: number;
+}
+
 export default function KickChatWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
   const theme = searchParams.theme || 'botrix';
   const fontSize = searchParams.fontSize || 'medium';
   const textStroke = searchParams.textStroke || 'thin';
 
-  // Tema stilleri (BotRix presetleri)
-  const getThemeClass = () => {
-    switch (theme) {
-      case 'botrix':
-        return 'bg-[#0e1015]/85 backdrop-blur-md border-l-4 border-[#53FC18] rounded-r-2xl border-t border-r border-b border-white/5 shadow-2xl';
-      case 'bubble':
-        return 'bg-[#141721]/90 backdrop-blur-lg border border-white/10 rounded-2xl shadow-xl';
-      case 'neon':
-        return 'bg-[#080a0f]/95 border border-[#53FC18] rounded-xl shadow-[0_0_20px_rgba(83,252,24,0.2)]';
-      case 'minimal':
-      default:
-        return 'bg-transparent border-0 shadow-none';
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let pingInterval: any = null;
+    let isCancelled = false;
+
+    const connectToKickChat = async () => {
+      let chatroomId: string | null = null;
+
+      // 1. Dinamik Chatroom ID Al
+      try {
+        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.chatroom_id) {
+            chatroomId = String(data.chatroom_id);
+          }
+        }
+      } catch (e) {}
+
+      if (isCancelled || !chatroomId) {
+        // Fallback kanal ID
+        chatroomId = '1917711';
+      }
+
+      // 2. Doğrudan Pusher WS Soketi
+      ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
+
+      ws.onopen = () => {
+        ws?.send(
+          JSON.stringify({
+            event: 'pusher:subscribe',
+            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
+          })
+        );
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          const ev = parsed.event || '';
+
+          if (ev.includes('ChatMessageEvent')) {
+            const raw = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
+            const sender = raw.sender || {};
+            const identity = sender.identity || {};
+
+            const newMsg: ChatMessage = {
+              id: String(raw.id || Date.now() + Math.random()),
+              user: sender.username || 'Kullanıcı',
+              content: raw.content || '',
+              color: identity.color || '#53FC18',
+              badges: identity.badges?.map((b: any) => b.type) || [],
+              createdAt: Date.now(),
+            };
+
+            setMessages((prev) => [...prev.slice(-30), newMsg]);
+          }
+        } catch (err) {}
+      };
+
+      pingInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
+        }
+      }, 20000);
+    };
+
+    connectToKickChat();
+
+    return () => {
+      isCancelled = true;
+      if (ws) ws.close();
+      if (pingInterval) clearInterval(pingInterval);
+    };
+  }, [channel]);
+
+  // Otomatik aşağı kaydırma
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
+  }, [messages]);
+
+  // Tipografi ve Kontur Hesaplamaları
+  const sizeStyles =
+    fontSize === 'small'
+      ? 'text-[11px] py-1.5 px-3'
+      : fontSize === 'large'
+      ? 'text-[15px] py-3 px-4'
+      : 'text-xs py-2 px-3.5';
+
+  const strokeStyle =
+    textStroke === 'thick'
+      ? { textShadow: '-1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 4px rgba(0,0,0,0.9)' }
+      : textStroke === 'thin'
+      ? { textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.9)' }
+      : {};
+
+  // Özel StreamWidget Tema Kartları
+  const renderCardTheme = (msg: ChatMessage) => {
+    if (theme === 'minimal') {
+      return (
+        <div key={msg.id} className={`animate-in fade-in slide-in-from-bottom-2 duration-200 ${sizeStyles}`} style={strokeStyle}>
+          <span className="font-black uppercase tracking-wider mr-2" style={{ color: msg.color }}>
+            {msg.user}:
+          </span>
+          <span className="text-white font-medium break-words">{msg.content}</span>
+        </div>
+      );
+    }
+
+    if (theme === 'bubble') {
+      return (
+        <div
+          key={msg.id}
+          className={`bg-[#121622]/85 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5 ${sizeStyles}`}
+          style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.35)', ...strokeStyle }}
+        >
+          <span className="font-black text-[11px] uppercase tracking-wide" style={{ color: msg.color }}>
+            {msg.user}
+          </span>
+          <p className="text-white/95 font-medium leading-relaxed break-words">{msg.content}</p>
+        </div>
+      );
+    }
+
+    if (theme === 'neon') {
+      return (
+        <div
+          key={msg.id}
+          className={`bg-[#07090e]/95 border border-[#53FC18]/60 rounded-xl shadow-[0_0_15px_rgba(83,252,24,0.15)] animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-baseline gap-2 ${sizeStyles}`}
+          style={strokeStyle}
+        >
+          <span className="font-black uppercase tracking-wider whitespace-nowrap" style={{ color: msg.color }}>
+            {msg.user}:
+          </span>
+          <span className="text-white font-medium break-words">{msg.content}</span>
+        </div>
+      );
+    }
+
+    // Varsayılan: BotRix / StreamWidget Pro Standart Kartı
+    return (
+      <div
+        key={msg.id}
+        className={`bg-[#0a0d14]/85 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200 flex flex-col gap-0.5 ${sizeStyles}`}
+        style={{
+          borderLeft: `4px solid ${msg.color}`,
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.45)',
+          ...strokeStyle,
+        }}
+      >
+        <span className="font-black text-[11px] uppercase tracking-wide" style={{ color: msg.color }}>
+          {msg.user}
+        </span>
+        <p className="text-white/95 font-medium leading-relaxed break-words">{msg.content}</p>
+      </div>
+    );
   };
 
-  const scaleClass =
-    fontSize === 'small' ? 'scale-90 origin-bottom-left' : fontSize === 'large' ? 'scale-110 origin-bottom-left' : 'scale-100';
-
-  const strokeFilter =
-    textStroke === 'thick'
-      ? 'drop-shadow(0 1.5px 1.5px #000) drop-shadow(0 -1.5px 1.5px #000) drop-shadow(1.5px 0 1.5px #000) drop-shadow(-1.5px 0 1.5px #000)'
-      : textStroke === 'thin'
-      ? 'drop-shadow(0 1px 1px #000) drop-shadow(1px 0 1px #000)'
-      : 'none';
-
   return (
-    <div className="w-screen h-screen flex flex-col justify-end p-6 bg-transparent select-none overflow-hidden font-sans">
-      <div className={`w-full max-w-md h-[88vh] relative overflow-hidden ${getThemeClass()} ${scaleClass} transition-all duration-200`}>
-        
-        {/* Canlı Chat İframe - Başlık ve sayaç kırpılmış */}
-        <iframe
-          src={`https://kick.com/popout/${encodeURIComponent(channel)}/chat`}
-          className="w-full h-[calc(100%+160px)] -mt-[75px] border-0 bg-transparent"
-          style={{
-            filter: strokeFilter,
-            pointerEvents: 'none',
-          }}
-          allow="autoplay"
-        />
-
-        {/* Alt input maskeleme */}
-        <div className="absolute bottom-0 left-0 right-0 h-5 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+    <div className="w-screen h-screen flex flex-col justify-end p-6 bg-transparent select-none font-sans overflow-hidden">
+      <div
+        ref={containerRef}
+        className="flex flex-col space-y-2.5 max-h-[90vh] overflow-y-auto scrollbar-none pr-2 max-w-md"
+      >
+        {messages.map((m) => renderCardTheme(m))}
       </div>
     </div>
   );
