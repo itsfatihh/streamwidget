@@ -1,167 +1,68 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Link from "next/link";
+import Link from 'next/link';
+import { WIDGETS_LIST } from '@/lib/widgets';
+import { LangCode } from '@/lib/i18n';
 
-export default function Home() {
-  const [lang, setLang] = useState<"tr" | "en">("tr");
-
-  const content = {
-    tr: {
-      badge: "Yayınlarınızı Üst Seviyeye Taşıyın",
-      desc: "OBS, Streamlabs ve Kick için modern, şeffaf ve gerçek zamanlı canlı yayın widget katmanları.",
-      btn: "Özelleştirici →",
-          widgets: [
-      {
-        id: "viewer-count",
-        title: "Kick Canlı İzleyici",
-        desc: "Kick kanalınızın anlık izleyici sayısını gösteren şeffaf neon rozet.",
-        href: "/builder/viewer-count",
-      },
-      {
-        id: "chat-box",
-        title: "Kick Canlı Sohbet (Chat Box)",
-        desc: "OBS için ultra hafif, resmi Kick rozetleri ve ifadeleriyle canlı sohbet.",
-        href: "/builder/chat-box",
-      },
-      {
-        id: "follower-goal",
-        title: "Takipçi Hedefi (Follower Goal)",
-        desc: "Kick takipçi sayısını otomatik çeken ve yeni takip geldikçe canlı ilerleyen çubuk.",
-        href: "/builder/follower-goal",
-      },
-      {
-        id: "sub-goal",
-        title: "Abone Hedefi (Sub Goal)",
-        desc: "Kick yeni abonelik ve hediye aboneliklerde canlı ilerleyen hedef çubuğu.",
-        href: "/builder/sub-goal",
-      },
-      {
-        id: "irl-hud",
-        title: "IRL Canlı Yayın HUD",
-        desc: "Dış mekan yayınları için modüler LIVE rozeti, saat, konum, hava durumu ve canlı pil durumu.",
-        href: "/builder/irl-hud",
-      },
-      {
-        id: "mini-map",
-        title: "NFS Mini-Map Radar",
-        desc: "GTA/NFS tarzı canlı radar haritası, hız kadranı ve telefondan anlık GPS takibi.",
-        href: "/builder/mini-map",
-      },
-      {
-        id: "clock",
-        title: "Minimal Dijital Saat",
-        desc: "Şık ve cam efektli ekran üzeri dijital saat katmanı.",
-        href: "/builder/clock",
-      },
-    ],
-    },
-    en: {
-      badge: "Level Up Your Streams",
-      desc: "Modern, transparent and real-time live stream widgets for OBS, Streamlabs and Kick.",
-      btn: "Customize →",
-          widgets: [
-      {
-        id: "viewer-count",
-        title: "Kick Live Viewers",
-        desc: "Transparent neon badge showing real-time Kick viewer count.",
-        href: "/builder/viewer-count",
-      },
-      {
-        id: "chat-box",
-        title: "Kick Live Chat Box",
-        desc: "Ultra lightweight chat overlay with official Kick badges and emotes.",
-        href: "/builder/chat-box",
-      },
-      {
-        id: "follower-goal",
-        title: "Follower Goal",
-        desc: "Dynamic progress bar for Kick followers with live sync.",
-        href: "/builder/follower-goal",
-      },
-      {
-        id: "sub-goal",
-        title: "Subscriber Goal",
-        desc: "Live updating progress bar for Kick subs and gifted subs.",
-        href: "/builder/sub-goal",
-      },
-      {
-        id: "irl-hud",
-        title: "IRL Stream HUD",
-        desc: "Modular LIVE badge, clock, location, weather and live battery overlay for IRL streams.",
-        href: "/builder/irl-hud",
-      },
-      {
-        id: "mini-map",
-        title: "NFS Mini-Map Radar",
-        desc: "GTA/NFS style live radar map, speedometer HUD, and instant phone GPS sync.",
-        href: "/builder/mini-map",
-      },
-      {
-        id: "clock",
-        title: "Minimal Digital Clock",
-        desc: "Clean, frosted glass style digital clock overlay for OBS.",
-        href: "/builder/clock",
-      },
-    ],
-    },
-  };
-
-  const t = content[lang];
+export default function HomePage() {
+  const lang: LangCode = 'tr';
 
   return (
-    <main className="min-h-screen bg-[#090a0f] text-white p-6 md:p-12 font-sans flex flex-col justify-between">
-      <div className="max-w-6xl mx-auto w-full space-y-12">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#53FC18] animate-pulse"></span>
-            <span className="font-extrabold tracking-wider text-sm">STREAMWIDGET</span>
-          </div>
-
-          <button
-            onClick={() => setLang(lang === "tr" ? "en" : "tr")}
-            className="flex items-center gap-2 bg-[#12141c] hover:bg-[#1a1e2b] border border-white/5 px-3 py-1.5 rounded-xl text-xs font-semibold transition"
-          >
-            <span>{lang === "tr" ? "🇹🇷 TR" : "🇬🇧 EN"}</span>
-            <span className="text-white/40 text-[10px]">▼</span>
-          </button>
-        </header>
-
-        <div className="text-center space-y-4 max-w-3xl mx-auto pt-6">
-          <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
-            {t.badge}
-          </h1>
-          <p className="text-white/50 text-sm md:text-base leading-relaxed">
-            {t.desc}
-          </p>
+    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans select-none">
+      {/* Üst Bar */}
+      <header className="border-b border-white/10 px-8 py-5 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-black tracking-widest text-sm text-white">STREAMWIDGET</span>
         </div>
+        <div className="bg-white/5 border border-white/10 px-3 py-1 rounded-full text-xs font-bold text-white/70">
+          🇹🇷 TR
+        </div>
+      </header>
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {t.widgets.map((w) => (
-            <div
-              key={w.id}
-              className="bg-[#0f1118] border border-white/5 hover:border-white/15 p-6 rounded-2xl flex flex-col justify-between space-y-6 transition-all duration-200"
-            >
-              <div className="space-y-2.5">
-                <h2 className="text-base font-bold text-white">{w.title}</h2>
-                <p className="text-xs text-white/45 leading-relaxed">{w.desc}</p>
+      {/* Hero Başlık */}
+      <section className="text-center pt-16 pb-12 px-6 max-w-4xl mx-auto space-y-4">
+        <h1 className="text-4xl md:text-5xl font-black tracking-tight text-white leading-tight">
+          Yayınlarınızı Üst Seviyeye Taşıyın
+        </h1>
+        <p className="text-sm md:text-base text-white/60 max-w-2xl mx-auto font-medium">
+          OBS, Streamlabs ve Kick için modern, şeffaf ve gerçek zamanlı canlı yayın widget katmanları.
+        </p>
+      </section>
+
+      {/* Widget Kartları Listesi */}
+      <main className="max-w-6xl w-full mx-auto px-6 pb-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {WIDGETS_LIST.map((w) => (
+          <div
+            key={w.id}
+            className="bg-[#0b0e14] border border-white/10 hover:border-emerald-500/40 rounded-3xl p-6 flex flex-col justify-between transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/5 group"
+          >
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  {w.category}
+                </span>
               </div>
-              <div className="flex justify-end">
-                <Link
-                  href={w.href || `/builder/${w.id || "mini-map"}`}
-                  className="bg-[#161822] hover:bg-[#1e2230] border border-white/5 text-white/80 hover:text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
-                >
-                  {t.btn}
-                </Link>
-              </div>
+              <h3 className="text-lg font-black tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+                {w.name[lang] || w.name['tr']}
+              </h3>
+              <p className="text-xs text-white/50 leading-relaxed">
+                {w.description[lang] || w.description['tr']}
+              </p>
             </div>
-          ))}
-        </section>
-      </div>
 
-      <footer className="text-center text-white/30 text-xs py-8 border-t border-white/5 mt-16">
-        StreamWidget &copy; {new Date().getFullYear()}
-      </footer>
-    </main>
+            <div className="pt-6 mt-4 border-t border-white/5 flex justify-end">
+              <Link
+                href={`/builder/${w.id}`}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-emerald-500 hover:text-black text-xs font-bold transition-all flex items-center gap-1.5"
+              >
+                <span>Özelleştirici</span>
+                <span>→</span>
+              </Link>
+            </div>
+          </div>
+        ))}
+      </main>
+    </div>
   );
 }
