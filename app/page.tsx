@@ -42,6 +42,16 @@ export default function Home() {
           desc: "Dış mekan yayınları için modüler LIVE rozeti, saat, konum, hava durumu ve canlı pil durumu.",
           href: "/builder/irl-hud",
         },
+  {
+    id: "mini-map",
+    name: "NFS Mini-Map Radar",
+    category: "IRL & Harita",
+    description: "GTA/NFS tarzı karanlık temalı radar mini haritası, hız kadranı ve canlı GPS takibi.",
+    icon: "Navigation",
+    badge: "YENİ",
+    bgGradient: "from-emerald-500/20 to-teal-500/20",
+    borderColor: "group-hover:border-emerald-500/50",
+  },
         {
           id: "clock",
           title: "Minimal Dijital Saat",
@@ -138,7 +148,7 @@ export default function Home() {
               </div>
               <div className="flex justify-end">
                 <Link
-                  href={w.href}
+                  href={w.href || `/builder/${w.id || "mini-map"}`}
                   className="bg-[#161822] hover:bg-[#1e2230] border border-white/5 text-white/80 hover:text-white px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
                 >
                   {t.btn}
