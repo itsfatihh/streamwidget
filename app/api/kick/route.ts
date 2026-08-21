@@ -17,38 +17,35 @@ export async function GET(req: NextRequest) {
 
     if (res.ok) {
       const data = await res.json();
-      const subBadges: Record<number, string> = {};
-      if (Array.isArray(data.subscriber_badges)) {
-        data.subscriber_badges.forEach((b: any) => {
-          if (b.months !== undefined && b.badge_image?.url) {
-            subBadges[b.months] = b.badge_image.url;
-          }
+      const count =
+        data.followers_count ??
+        data.followersCount ??
+        data.followers_count_str ??
+        data.user?.followers_count ??
+        0;
+
+      return NextResponse.json({
+        success: true,
+        followers_count: Number(count),
+        chatroom_id: data.chatroom?.id || data.id,
+      });
+    }
+
+    // HTML Fallback: Sayfadan doğrudan follower sayısını regex ile çek
+    const pageRes = await fetch("https://kick.com/" + encodeURIComponent(channel), { headers });
+    if (pageRes.ok) {
+      const html = await pageRes.text();
+      const match = html.match(/"followers_count":(\d+)/) || html.match(/"followersCount":(\d+)/);
+      if (match && match[1]) {
+        return NextResponse.json({
+          success: true,
+          followers_count: parseInt(match[1], 10),
         });
       }
-
-      return NextResponse.json({
-        success: true,
-        chatroom_id: data.chatroom?.id || data.id,
-        subscriber_badges: subBadges,
-      });
     }
 
-    const v1Res = await fetch("https://kick.com/api/v1/channels/" + encodeURIComponent(channel), {
-      headers,
-      cache: "no-store",
-    });
-
-    if (v1Res.ok) {
-      const dataV1 = await v1Res.json();
-      return NextResponse.json({
-        success: true,
-        chatroom_id: dataV1.chatroom?.id || dataV1.chatroom_id,
-        subscriber_badges: {},
-      });
-    }
-
-    return NextResponse.json({ success: false, error: "Channel not found" }, { status: 404 });
+    return NextResponse.json({ success: false, followers_count: 0 });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, followers_count: 0, error: err.message });
   }
 }

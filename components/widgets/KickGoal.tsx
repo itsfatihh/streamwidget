@@ -4,16 +4,14 @@ import React, { useState, useEffect } from 'react';
 
 export default function KickGoalWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
-  const title = searchParams.title || 'Takipçi Hedefi';
-  const target = Math.max(1, parseInt(searchParams.target || '100', 10));
-  const theme = searchParams.theme || 'minimal';
+  const title = searchParams.title || 'TAKİPÇİ HEDEFİ';
+  const target = Math.max(1, parseInt(searchParams.target || '5000', 10));
+  const theme = searchParams.theme || 'framed';
   const barColor = searchParams.barColor || '#53FC18';
-  
-  // Manuel girilmiş başlangıç değeri varsa al, yoksa 0'dan başlatıp API'den çekecek
   const manualStart = searchParams.startCount ? parseInt(searchParams.startCount, 10) : null;
 
   const [current, setCurrent] = useState<number>(manualStart ?? 0);
-  const [initialLoaded, setInitialLoaded] = useState<boolean>(manualStart !== null);
+  const [loaded, setLoaded] = useState<boolean>(manualStart !== null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -25,14 +23,13 @@ export default function KickGoalWidget({ searchParams }: { searchParams: Record<
           const data = await res.json();
           if (!isCancelled && typeof data.followers_count === 'number') {
             setCurrent(data.followers_count);
-            setInitialLoaded(true);
+            setLoaded(true);
           }
         }
       } catch (e) {}
     };
 
     fetchFollowers();
-    // 10 saniyede bir güncel takipçiyi sorgula
     const interval = setInterval(fetchFollowers, 10000);
 
     return () => {
@@ -46,30 +43,31 @@ export default function KickGoalWidget({ searchParams }: { searchParams: Record<
   return (
     <div className="w-screen h-screen flex items-center justify-center p-6 bg-transparent select-none font-sans">
       <div
-        className={`w-full max-w-md p-5 transition-all duration-300 ${
+        className={`w-full max-w-md p-4 transition-all duration-300 ${
           theme === 'framed'
             ? 'bg-[#0a0d14]/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.6)]'
             : 'bg-transparent'
         }`}
       >
-        {/* Başlık ve Sayı */}
-        <div className="flex justify-between items-baseline mb-2 text-white font-bold">
-          <span className="text-sm tracking-wider uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-            {title}
-          </span>
-          <span className="text-xs font-mono text-white/80 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-            {initialLoaded ? current : '...'} / {target} ({percentage}%)
+        <div className="flex justify-between items-center mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#53FC18] shadow-[0_0_8px_#53FC18]" />
+            <span className="text-white font-extrabold text-xs uppercase tracking-wider">
+              {title}
+            </span>
+          </div>
+          <span className="text-white font-mono font-bold text-xs tracking-tight">
+            {loaded ? current.toLocaleString('tr-TR') : '0'} / {target.toLocaleString('tr-TR')} ({percentage}%)
           </span>
         </div>
 
-        {/* İlerleme Çubuğu */}
-        <div className="w-full h-4 bg-black/60 rounded-full overflow-hidden border border-white/10 p-0.5 shadow-inner">
+        <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden p-[1px]">
           <div
-            className="h-full rounded-full transition-all duration-500 ease-out"
+            className="h-full rounded-full transition-all duration-700 ease-out"
             style={{
               width: `${percentage}%`,
               backgroundColor: barColor,
-              boxShadow: `0 0 12px ${barColor}80`,
+              boxShadow: `0 0 10px ${barColor}`,
             }}
           />
         </div>
