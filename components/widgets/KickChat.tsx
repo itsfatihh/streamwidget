@@ -7,8 +7,6 @@ interface ChatMessage {
   user: string;
   content: string;
   color: string;
-  badges?: string[];
-  createdAt: number;
 }
 
 export default function KickChatWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
@@ -22,88 +20,87 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
 
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let pingInterval: any = null;
+    let pingTimer: any = null;
     let isCancelled = false;
 
-    const connectToKickChat = async () => {
-      let chatroomId: string | null = null;
+    const startPusherChat = async () => {
+      let chatroomId = '1917711';
 
-      // 1. Dinamik Chatroom ID Al
+      // 1. Chatroom ID al
       try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`);
         if (res.ok) {
           const data = await res.json();
-          if (data && data.chatroom_id) {
-            chatroomId = String(data.chatroom_id);
-          }
+          if (data?.chatroom_id) chatroomId = String(data.chatroom_id);
         }
       } catch (e) {}
 
-      if (isCancelled || !chatroomId) {
-        // Fallback kanal ID
-        chatroomId = '1917711';
-      }
+      if (isCancelled) return;
 
-      // 2. Doğrudan Pusher WS Soketi
-      ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
-
-      ws.onopen = () => {
-        ws?.send(
-          JSON.stringify({
-            event: 'pusher:subscribe',
-            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
-          })
-        );
-      };
+      // 2. Pusher Protokolü ile Doğrudan Bağlan
+      ws = new WebSocket(
+        'wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=8.4.0-rc2&flash=false'
+      );
 
       ws.onmessage = (event) => {
         try {
-          const parsed = JSON.parse(event.data);
-          const ev = parsed.event || '';
+          const data = JSON.parse(event.data);
 
-          if (ev.includes('ChatMessageEvent')) {
-            const raw = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
-            const sender = raw.sender || {};
+          // Pusher bağlantı onaylandığında kanala abone ol
+          if (data.event === 'pusher:connection_established') {
+            ws?.send(
+              JSON.stringify({
+                event: 'pusher:subscribe',
+                data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
+              })
+            );
+          }
+
+          // Canlı mesaj yakalama
+          if (
+            data.event === 'App\\Events\\ChatMessageEvent' ||
+            data.event === 'ChatMessageEvent' ||
+            (data.event && data.event.includes('ChatMessageEvent'))
+          ) {
+            const rawMsg = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
+            const sender = rawMsg.sender || {};
             const identity = sender.identity || {};
 
             const newMsg: ChatMessage = {
-              id: String(raw.id || Date.now() + Math.random()),
+              id: String(rawMsg.id || Date.now() + Math.random()),
               user: sender.username || 'Kullanıcı',
-              content: raw.content || '',
+              content: rawMsg.content || '',
               color: identity.color || '#53FC18',
-              badges: identity.badges?.map((b: any) => b.type) || [],
-              createdAt: Date.now(),
             };
 
-            setMessages((prev) => [...prev.slice(-30), newMsg]);
+            setMessages((prev) => [...prev.slice(-35), newMsg]);
           }
         } catch (err) {}
       };
 
-      pingInterval = setInterval(() => {
+      // 15 saniyede bir Pusher ping
+      pingTimer = setInterval(() => {
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
         }
-      }, 20000);
+      }, 15000);
     };
 
-    connectToKickChat();
+    startPusherChat();
 
     return () => {
       isCancelled = true;
       if (ws) ws.close();
-      if (pingInterval) clearInterval(pingInterval);
+      if (pingTimer) clearInterval(pingTimer);
     };
   }, [channel]);
 
-  // Otomatik aşağı kaydırma
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Tipografi ve Kontur Hesaplamaları
   const sizeStyles =
     fontSize === 'small'
       ? 'text-[11px] py-1.5 px-3'
@@ -118,7 +115,6 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       ? { textShadow: '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 1px 2px rgba(0,0,0,0.9)' }
       : {};
 
-  // Özel StreamWidget Tema Kartları
   const renderCardTheme = (msg: ChatMessage) => {
     if (theme === 'minimal') {
       return (
@@ -161,7 +157,6 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       );
     }
 
-    // Varsayılan: BotRix / StreamWidget Pro Standart Kartı
     return (
       <div
         key={msg.id}
