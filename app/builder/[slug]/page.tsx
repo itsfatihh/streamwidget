@@ -1,6 +1,8 @@
 'use client';
 
 function normalizeSlug(s: string) {
+  const c = (s || "").toLowerCase().trim();
+  if (["mini-map", "radar", "radar-hud", "map"].includes(c)) return "mini-map";
   const clean = s.toLowerCase().trim();
   if (["chat-box", "chat", "kick-chat", "kick-chat-box"].includes(clean)) return "kick-chat";
   if (["viewer-count", "viewers", "kick-viewers", "kick-viewer-count", "live-viewers"].includes(clean)) return "kick-viewers";
