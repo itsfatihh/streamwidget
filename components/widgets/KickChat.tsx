@@ -5,9 +5,8 @@ import React, { useState, useEffect, useRef } from 'react';
 interface ChatBadge {
   type: string;
   text?: string;
-  active?: boolean;
   count?: number;
-  badge_image?: string;
+  active?: boolean;
 }
 
 interface ChatMessage {
@@ -21,139 +20,9 @@ interface ChatMessage {
 const CHANNEL_CHATROOM_MAP: Record<string, string> = {
   itsfatih: '1917711',
   batuhankaradeniz: '2437618',
+  cavs: '2437618',
   elraenn: '2437618',
   kendinemuzisyen: '2437618',
-};
-
-// Kick Orijinal Rozet Render Motoru
-const renderBadgeIcon = (badge: ChatBadge, idx: number): React.ReactNode => {
-  const type = badge.type?.toLowerCase() || '';
-
-  // Özel kanal görsel rozeti varsa doğrudan göster
-  if (badge.badge_image) {
-    return (
-      <img
-        key={idx}
-        src={badge.badge_image}
-        alt={badge.text || type}
-        className="inline-block h-4 w-auto align-middle object-contain"
-      />
-    );
-  }
-
-  // 1. Abone Rozeti (Görseldeki Orijinal Yeşil Çerçeveli Yıldızlı Kutu: [★ 10])
-  if (type === 'subscriber' || type === 'sub') {
-    return (
-      <span
-        key={idx}
-        className="inline-flex items-center justify-center gap-0.5 bg-black border border-[#53FC18] text-[#53FC18] font-bold text-[10px] px-1 py-[1px] rounded-[4px] leading-none tracking-tight shadow-[0_0_8px_rgba(83,252,24,0.2)]"
-      >
-        <svg className="w-2.5 h-2.5 fill-[#53FC18]" viewBox="0 0 24 24">
-          <path d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.784 1.399 8.165-7.333-3.856-7.333 3.856 1.399-8.165-5.934-5.784 8.2-1.192zm0 5.702l-2.232 4.523-4.991.725 3.612 3.521-.852 4.97 4.463-2.347 4.463 2.347-.852-4.97 3.612-3.521-4.991-.725z" />
-        </svg>
-        <span>{badge.count ?? 1}</span>
-      </span>
-    );
-  }
-
-  // 2. VIP Rozeti (Kick Pembe/Mor Elmas)
-  if (type === 'vip') {
-    return (
-      <span
-        key={idx}
-        title="VIP"
-        className="inline-flex items-center justify-center bg-[#a855f7]/20 border border-[#c084fc] text-[#e9d5ff] font-black text-[9px] px-1 py-[1px] rounded-[4px] leading-none"
-      >
-        VIP
-      </span>
-    );
-  }
-
-  // 3. Moderatör Rozeti (Kick Kılıç/Kalkan Rozeti)
-  if (type === 'moderator' || type === 'mod') {
-    return (
-      <span
-        key={idx}
-        title="Moderatör"
-        className="inline-flex items-center justify-center bg-[#00e59b]/20 border border-[#00e59b] text-[#00e59b] font-bold text-[9px] px-1 py-[1px] rounded-[4px] leading-none"
-      >
-        <svg className="w-2.5 h-2.5 fill-[#00e59b]" viewBox="0 0 24 24">
-          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1 6h2v6h-2V7zm0 8h2v2h-2v-2z" />
-        </svg>
-      </span>
-    );
-  }
-
-  // 4. Yayıncı (Broadcaster / Host)
-  if (type === 'broadcaster') {
-    return (
-      <span
-        key={idx}
-        title="Yayıncı"
-        className="inline-flex items-center justify-center bg-[#53FC18] text-black font-black text-[9px] px-1 py-[1px] rounded-[4px] leading-none"
-      >
-        HOST
-      </span>
-    );
-  }
-
-  // 5. OG / Kurucu
-  if (type === 'og' || type === 'founder') {
-    return (
-      <span
-        key={idx}
-        title="OG"
-        className="inline-flex items-center justify-center bg-[#3b82f6]/25 border border-[#60a5fa] text-[#93c5fd] font-bold text-[9px] px-1 py-[1px] rounded-[4px] leading-none"
-      >
-        OG
-      </span>
-    );
-  }
-
-  // 6. Doğrulanmış Hesap
-  if (type === 'verified') {
-    return (
-      <span key={idx} title="Doğrulanmış" className="inline-flex items-center justify-center text-[#53FC18]">
-        <svg className="w-3.5 h-3.5 fill-[#53FC18]" viewBox="0 0 24 24">
-          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-        </svg>
-      </span>
-    );
-  }
-
-  return null;
-};
-
-// Kick Emote Parser: [emote:12345:name] -> CDN <img>
-const renderParsedContent = (content: string): React.ReactNode => {
-  const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_-]+)\]/g;
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match;
-
-  while ((match = emoteRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(content.substring(lastIndex, match.index));
-    }
-    const emoteId = match[1];
-    const emoteName = match[2];
-    parts.push(
-      <img
-        key={`${emoteId}-${match.index}`}
-        src={`https://files.kick.com/emotes/${emoteId}/fullsize`}
-        alt={emoteName}
-        title={emoteName}
-        className="inline-block h-6 w-auto align-middle mx-0.5 object-contain my-[-3px]"
-      />
-    );
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < content.length) {
-    parts.push(content.substring(lastIndex));
-  }
-
-  return parts.length > 0 ? parts : content;
 };
 
 export default function KickChatWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
@@ -163,6 +32,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
   const textStroke = searchParams.textStroke || 'none';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [subBadges, setSubBadges] = useState<Record<number, string>>({});
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -180,10 +50,13 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
           if (data && data.chatroom_id) {
             chatroomId = String(data.chatroom_id);
           }
+          if (data && data.subscriber_badges) {
+            setSubBadges(data.subscriber_badges);
+          }
         }
       } catch (e) {}
 
-      if (channel === 'batuhankaradeniz') chatroomId = '2437618';
+      if (channel === 'batuhankaradeniz' || channel === 'cavs') chatroomId = '2437618';
       if (channel === 'itsfatih') chatroomId = '1917711';
 
       if (isCancelled) return;
@@ -196,7 +69,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
         ws?.send(
           JSON.stringify({
             event: 'pusher:subscribe',
-            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
+            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
           })
         );
       };
@@ -257,6 +130,116 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     }
   }, [messages]);
 
+  // Kanalın Orijinal Rozetini Basan Fonksiyon
+  const renderBadge = (badge: ChatBadge, idx: number): React.ReactNode => {
+    const type = badge.type?.toLowerCase() || '';
+
+    // 1. Abone Rozeti: Yayıncının yüklediği orijinal görseli (bot vs.) göster
+    if (type === 'subscriber' || type === 'sub') {
+      const months = badge.count ?? 1;
+      
+      let badgeUrl = subBadges[months];
+      if (!badgeUrl) {
+        // En yakın alt kademe ayını bul (örn: 2 aylık abone ise 2 ay rozeti, 5 ise 3 ay rozeti)
+        const sortedMonths = Object.keys(subBadges).map(Number).sort((a, b) => b - a);
+        const match = sortedMonths.find((m) => months >= m);
+        if (match) badgeUrl = subBadges[match];
+      }
+
+      if (badgeUrl) {
+        return (
+          <img
+            key={idx}
+            src={badgeUrl}
+            alt={`${months} Ay Abone`}
+            title={`${months} Ay Abone`}
+            className="inline-block h-4 w-4 object-contain align-middle mx-0.5 rounded-[2px]"
+          />
+        );
+      }
+
+      // Görsel yüklenmemişse orijinal yeşil Kick çerçeveli kutu
+      return (
+        <span
+          key={idx}
+          className="inline-flex items-center justify-center bg-black border border-[#53FC18] text-[#53FC18] font-bold text-[9px] px-1 py-[1px] rounded-[3px] leading-none"
+        >
+          ★ {months}
+        </span>
+      );
+    }
+
+    // 2. VIP Rozeti
+    if (type === 'vip') {
+      return (
+        <span key={idx} title="VIP" className="inline-flex items-center justify-center bg-[#a855f7] text-white font-black text-[9px] px-1 py-[1px] rounded-[3px] leading-none">
+          VIP
+        </span>
+      );
+    }
+
+    // 3. Moderatör Rozeti
+    if (type === 'moderator' || type === 'mod') {
+      return (
+        <span key={idx} title="Moderatör" className="inline-flex items-center justify-center bg-[#00e59b] text-black font-black text-[9px] px-1 py-[1px] rounded-[3px] leading-none">
+          MOD
+        </span>
+      );
+    }
+
+    // 4. Yayıncı Rozeti
+    if (type === 'broadcaster') {
+      return (
+        <span key={idx} title="Yayıncı" className="inline-flex items-center justify-center bg-[#53FC18] text-black font-black text-[9px] px-1 py-[1px] rounded-[3px] leading-none">
+          HOST
+        </span>
+      );
+    }
+
+    // 5. OG / Kurucu Rozeti
+    if (type === 'og' || type === 'founder') {
+      return (
+        <span key={idx} title="OG" className="inline-flex items-center justify-center bg-[#3b82f6] text-white font-black text-[9px] px-1 py-[1px] rounded-[3px] leading-none">
+          OG
+        </span>
+      );
+    }
+
+    return null;
+  };
+
+  // Emote Parser: [emote:12345:name] -> CDN <img>
+  const renderParsedContent = (content: string): React.ReactNode => {
+    const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_-]+)\]/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = emoteRegex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+      const emoteId = match[1];
+      const emoteName = match[2];
+      parts.push(
+        <img
+          key={`${emoteId}-${match.index}`}
+          src={`https://files.kick.com/emotes/${emoteId}/fullsize`}
+          alt={emoteName}
+          title={emoteName}
+          className="inline-block h-6 w-auto align-middle mx-0.5 object-contain my-[-3px]"
+        />
+      );
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : content;
+  };
+
   const sizeStyles =
     fontSize === 'small'
       ? 'text-[12px] py-1 px-2'
@@ -272,13 +255,12 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       : {};
 
   const renderCard = (msg: ChatMessage) => {
-    // Minimal Tema
     if (theme === 'minimal') {
       return (
         <div key={msg.id} className={`animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-center flex-wrap gap-x-1.5 ${sizeStyles}`} style={strokeStyle}>
           {msg.badges.length > 0 && (
             <span className="inline-flex items-center gap-1">
-              {msg.badges.map((b, i) => renderBadgeIcon(b, i))}
+              {msg.badges.map((b, i) => renderBadge(b, i))}
             </span>
           )}
           <span className="font-black uppercase tracking-wider" style={{ color: msg.color }}>
@@ -291,7 +273,6 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       );
     }
 
-    // Çerçeveli Tema
     return (
       <div
         key={msg.id}
@@ -305,7 +286,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
         <div className="flex items-center gap-1.5">
           {msg.badges.length > 0 && (
             <span className="inline-flex items-center gap-1">
-              {msg.badges.map((b, i) => renderBadgeIcon(b, i))}
+              {msg.badges.map((b, i) => renderBadge(b, i))}
             </span>
           )}
           <span className="font-black text-[11px] uppercase tracking-wide" style={{ color: msg.color }}>
