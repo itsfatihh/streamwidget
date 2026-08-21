@@ -67,8 +67,8 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
 
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let pingInterval: NodeJS.Timeout | null = null;
     let isCancelled = false;
+    let reconnectTimeout: NodeJS.Timeout;
 
     async function initChat() {
       try {
@@ -84,7 +84,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
         if (isCancelled) return;
         setStatusText(`Sohbete bağlanılıyor...`);
 
-        // Kick resmi Pusher App Key
+        // Kick Pusher App Key
         ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f28308142977d07?protocol=7&client=js&version=7.6.0&flash=false');
 
         ws.onopen = () => {
@@ -94,31 +94,28 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
               data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
             })
           );
-
-          pingInterval = setInterval(() => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
-            }
-          }, 20000);
         };
 
         ws.onmessage = (event) => {
           try {
             const parsed = JSON.parse(event.data);
             
-            // Abonelik başarıyla gerçekleştiğinde durumu güncelle
+            // 1. HAYATİ BÖLÜM: Sunucudan ping gelirse, PONG ile yanıt ver. Bağlantı artık kopmaz.
+            if (parsed.event === 'pusher:ping') {
+              ws?.send(JSON.stringify({ event: 'pusher:pong', data: {} }));
+              return;
+            }
+
+            // 2. Abonelik başarılı onayı
             if (parsed.event === 'pusher_internal:subscription_succeeded') {
               setStatusText(`Sohbete bağlanıldı (${channel}) ✓`);
             }
 
-            // Gelen veriyi parse et (Event adına bakmadan içerik analizi yap - Duck Typing)
+            // 3. Mesaj yakalama (Duck-Typing)
             if (parsed.data) {
               const msgData = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
-              
-              // Eğer gelen veri bir chat mesajı özelliklerini taşıyorsa state'e ekle
               if (msgData && msgData.content && msgData.sender && msgData.sender.username) {
                 setMessages((prev) => {
-                  // Aynı mesajın (Pusher duplike) tekrardan eklenmesini engelle
                   if (prev.some((m) => m.id === msgData.id)) return prev;
                   return [...prev.slice(-49), msgData];
                 });
@@ -130,20 +127,31 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
         ws.onclose = () => {
           if (!isCancelled) {
             setStatusText(`Bağlantı koptu, yeniden deneniyor...`);
-            setTimeout(initChat, 3000);
+            reconnectTimeout = setTimeout(initChat, 5000);
           }
         };
+
+        ws.onerror = () => {
+          // onError tetiklendiğinde zaten onClose'a da düşer, tekrar bağlanmayı oradan yöneteceğiz.
+        };
       } catch (err) {
-        if (!isCancelled) setStatusText(`Bağlantı hatası (${channel})`);
+        if (!isCancelled) {
+          setStatusText(`Bağlantı hatası, tekrar deneniyor...`);
+          reconnectTimeout = setTimeout(initChat, 5000);
+        }
       }
     }
 
     initChat();
 
+    // Bileşen ekrandan kalktığında WebSocket'i güvenli şekilde kapat
     return () => {
       isCancelled = true;
-      if (pingInterval) clearInterval(pingInterval);
-      if (ws) ws.close();
+      clearTimeout(reconnectTimeout);
+      if (ws) {
+        ws.onclose = null; // Kapatırken sonsuz döngüye girmesin
+        ws.close();
+      }
     };
   }, [channel]);
 
