@@ -17,59 +17,106 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
 
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [speed, setSpeed] = useState<number>(0);
-  const [locationName, setLocationName] = useState<string>('GPS Aranıyor...');
-  const [gpsSource, setGpsSource] = useState<'LIVE GPS' | 'IP NET'>('IP NET');
+  const [locationName, setLocationName] = useState<string>('GPS İzni Bekleniyor...');
+  const [gpsStatus, setGpsStatus] = useState<'OK' | 'WAITING' | 'DENIED'>('WAITING');
 
+  // 1. Cihazın Gerçek Donanımsal GPS'ini Dinle (navigator.geolocation)
   useEffect(() => {
+    let watchId: number | null = null;
     let isCancelled = false;
 
-    const fetchGpsLocation = async () => {
+    // Koordinat değiştikçe cadde/mahalle adını bul (Reverse Geocode)
+    const reverseGeocode = async (lat: number, lon: number) => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=tr,en`,
+          { headers: { 'User-Agent': 'StreamWidget/1.0' } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!isCancelled && data) {
+            const place =
+              data.address?.suburb ||
+              data.address?.neighbourhood ||
+              data.address?.town ||
+              data.address?.city_district ||
+              data.address?.city ||
+              data.address?.county ||
+              'Canlı Konum';
+            setLocationName(place);
+          }
+        }
+      } catch (e) {}
+    };
+
+    // A. Önce doğrudan cihazın donanım GPS'ini iste
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          if (isCancelled) return;
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          
+          setCoords({ lat, lon });
+          setGpsStatus('OK');
+
+          // Hız (m/s -> km/h)
+          if (position.coords.speed !== null && position.coords.speed !== undefined) {
+            setSpeed(Math.round(position.coords.speed * 3.6));
+          }
+
+          reverseGeocode(lat, lon);
+        },
+        (error) => {
+          console.warn('Cihaz GPS izni alınamadı veya engellendi:', error.message);
+          if (!coords && !isCancelled) {
+            setGpsStatus('DENIED');
+            setLocationName('GPS İzni Verilmedi');
+          }
+        },
+        {
+          enableHighAccuracy: true, // Tam donanımsal GPS çipini ve en yüksek hassasiyeti kullan
+          timeout: 15000,
+          maximumAge: 0, // Önbellekteki eski konumu kullanma, anlık al
+        }
+      );
+    }
+
+    // B. Streamlabs / Telefon GPS vericisi API entegrasyonu (/api/gps)
+    const checkApiGps = async () => {
       try {
         const gpsRes = await fetch(`/api/gps?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (gpsRes.ok) {
-          const gpsData = await gpsRes.json();
-          if (gpsData?.lat && gpsData?.lon) {
-            if (!isCancelled) {
-              setCoords({ lat: parseFloat(gpsData.lat), lon: parseFloat(gpsData.lon) });
-              setSpeed(Math.round(gpsData.speed || 0));
-              setGpsSource('LIVE GPS');
-              if (gpsData.city) setLocationName(gpsData.city);
-              return;
-            }
+          const data = await gpsRes.json();
+          if (data?.lat && data?.lon && !isCancelled) {
+            const lat = parseFloat(data.lat);
+            const lon = parseFloat(data.lon);
+            setCoords({ lat, lon });
+            setGpsStatus('OK');
+            if (data.speed !== undefined) setSpeed(Math.round(data.speed));
+            if (data.city) setLocationName(data.city);
+            else reverseGeocode(lat, lon);
           }
         }
-
-        if (!coords) {
-          const ipRes = await fetch('https://ipwho.is/');
-          if (ipRes.ok) {
-            const ipData = await ipRes.json();
-            if (ipData.success && !isCancelled) {
-              setCoords({ lat: ipData.latitude, lon: ipData.longitude });
-              setLocationName(ipData.city || ipData.region || 'Canlı Konum');
-              setGpsSource('IP NET');
-            }
-          }
-        }
-      } catch (err) {
-        if (!coords && !isCancelled) {
-          setCoords({ lat: 41.0082, lon: 28.9784 });
-          setLocationName('İstanbul');
-        }
-      }
+      } catch (e) {}
     };
 
-    fetchGpsLocation();
-    const interval = setInterval(fetchGpsLocation, 4000);
+    const interval = setInterval(checkApiGps, 3000);
 
     return () => {
       isCancelled = true;
+      if (watchId !== null && typeof window !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
       clearInterval(interval);
     };
   }, [channel]);
 
+  // Varsayılan koordinat (izin verilene kadar)
   const lat = coords?.lat ?? 41.0082;
   const lon = coords?.lon ?? 28.9784;
 
+  // Harita Bounding Box
   const delta = zoom >= 17 ? 0.0035 : zoom >= 15 ? 0.0075 : 0.018;
   const bbox = `${lon - delta},${lat - delta},${lon + delta},${lat + delta}`;
   const mapEmbedUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lon}`;
@@ -128,10 +175,14 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
           <div className="bg-[#0b0e14]/90 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5 shadow-lg">
             <span
               className={`w-2 h-2 rounded-full ${
-                gpsSource === 'LIVE GPS' ? 'bg-emerald-400 animate-pulse' : 'bg-cyan-400'
+                gpsStatus === 'OK'
+                  ? 'bg-emerald-400 animate-pulse'
+                  : gpsStatus === 'WAITING'
+                  ? 'bg-amber-400 animate-ping'
+                  : 'bg-red-500'
               }`}
             />
-            <span className="text-[10px] font-black uppercase tracking-wider text-white truncate max-w-[120px]">
+            <span className="text-[10px] font-black uppercase tracking-wider text-white truncate max-w-[130px]">
               {locationName}
             </span>
           </div>
