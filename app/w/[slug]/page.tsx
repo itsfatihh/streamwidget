@@ -227,9 +227,9 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
 
 
 function KickPinnedWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
-  const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
-  const position = searchParams.position || 'top-left';
-  const accent = searchParams.accent || '#53FC18';
+  const channel = (searchParams.channel || "itsfatih").toLowerCase().trim();
+  const position = searchParams.position || "top-left";
+  const accent = searchParams.accent || "#53FC18";
 
   const [pinned, setPinned] = useState<{
     id: string;
@@ -238,14 +238,12 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     color?: string;
   } | null>(null);
 
-  const lastIdRef = useRef<string | null>(null);
-
   const playPingSound = () => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sine';
+      osc.type = "sine";
       osc.frequency.setValueAtTime(587.33, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
@@ -257,111 +255,97 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     } catch (e) {}
   };
 
-  const applyPin = (rawPin: any) => {
-    if (!rawPin) {
-      if (lastIdRef.current !== null) {
-        lastIdRef.current = null;
-        setPinned(null);
-      }
-      return;
-    }
-
-    const pinId = String(rawPin.id || rawPin.message_id || Date.now());
-    const sender =
-      rawPin.sender?.username ||
-      rawPin.user?.username ||
-      rawPin.author?.username ||
-      'Moderatör';
-    const messageContent =
-      rawPin.content ||
-      rawPin.message?.content ||
-      rawPin.message ||
-      '';
-    const userColor =
-      rawPin.sender?.identity?.color ||
-      rawPin.user?.identity?.color ||
-      accent;
-
-    if (lastIdRef.current !== pinId) {
-      lastIdRef.current = pinId;
-      setPinned({
-        id: pinId,
-        username: sender,
-        content: messageContent,
-        color: userColor,
-      });
-      playPingSound();
-    }
-  };
-
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let pollInterval: any = null;
+    let keepAlive: any = null;
 
-    // A. Anlık ve Periyodik API Kontrolü (Kesin Fallback)
-    const checkApi = async () => {
-      try {
-        const res = await fetch(`/api/kick/pinned?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          applyPin(data.pinned);
-        }
-      } catch (err) {}
-    };
+    const chatroomId = "1917711";
 
-    checkApi();
-    pollInterval = setInterval(checkApi, 2500);
-
-    // B. WebSocket Bağlantısı (Anlık Pusher)
-    const chatroomId = channel === 'itsfatih' ? '1917711' : '';
-    ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
+    ws = new WebSocket("wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false");
 
     ws.onopen = () => {
-      const cid = chatroomId || '1917711';
       ws?.send(JSON.stringify({
-        event: 'pusher:subscribe',
-        data: { auth: '', channel: `chatrooms.${cid}.v2` }
+        event: "pusher:subscribe",
+        data: { auth: "", channel: "chatrooms." + chatroomId + ".v2" }
       }));
     };
 
     ws.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data);
-        const ev = parsed.event || '';
 
-        if (ev.includes('ChatMessagePinned') || ev.includes('PinnedMessage') || ev.includes('pinned')) {
-          if (ev.includes('Unpin') || ev.includes('Deleted')) {
-            applyPin(null);
+        // 1. Kick Resmi Pinned Event
+        if (parsed.event && parsed.event.toLowerCase().includes("pinned")) {
+          if (parsed.event.toLowerCase().includes("unpin") || parsed.event.toLowerCase().includes("delete")) {
+            setPinned(null);
             return;
           }
-          const payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
-          applyPin(payload.pinned_message || payload.message || payload);
-        } else if (ev.includes('ChatMessageUnpinned') || ev.includes('PinnedMessageDeleted')) {
-          applyPin(null);
+          const pData = typeof parsed.data === "string" ? JSON.parse(parsed.data) : parsed.data;
+          const msg = pData.message || pData.pinned_message || pData;
+          setPinned({
+            id: String(msg.id || Date.now()),
+            username: msg.sender?.username || msg.user?.username || "Moderator",
+            content: msg.content || msg.message || "",
+            color: msg.sender?.identity?.color || accent,
+          });
+          playPingSound();
+          return;
         }
-      } catch (e) {}
+
+        // 2. Chat Komut Dinleyicisi
+        if (parsed.event === "App\\Events\\ChatMessageEvent") {
+          const msgData = typeof parsed.data === "string" ? JSON.parse(parsed.data) : parsed.data;
+          const raw = (msgData.content || "").trim();
+          const sender = msgData.sender?.username || "Yayinci";
+          const color = msgData.sender?.identity?.color || accent;
+
+          if (raw.toLowerCase() === "!unpin" || raw.toLowerCase() === "!pinkaldir") {
+            setPinned(null);
+            return;
+          }
+
+          if (raw.toLowerCase().startsWith("!pin ")) {
+            const text = raw.substring(5).trim();
+            if (text) {
+              setPinned({
+                id: String(msgData.id || Date.now()),
+                username: sender,
+                content: text,
+                color: color,
+              });
+              playPingSound();
+            }
+          }
+        }
+      } catch (err) {}
     };
+
+    keepAlive = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: "pusher:ping", data: {} }));
+      }
+    }, 25000);
 
     return () => {
       if (ws) ws.close();
-      if (pollInterval) clearInterval(pollInterval);
+      if (keepAlive) clearInterval(keepAlive);
     };
   }, [channel]);
 
   if (!pinned) return <div className="w-screen h-screen bg-transparent" />;
 
   const posClass =
-    position === 'top-right'
-      ? 'items-start justify-end p-8'
-      : position === 'bottom-center'
-      ? 'items-end justify-center p-8'
-      : 'items-start justify-start p-8';
+    position === "top-right"
+      ? "items-start justify-end p-8"
+      : position === "bottom-center"
+      ? "items-end justify-center p-8"
+      : "items-start justify-start p-8";
 
   return (
-    <div className={`w-screen h-screen flex ${posClass} bg-transparent select-none animate-in fade-in zoom-in-95 duration-300`}>
+    <div className={"w-screen h-screen flex " + posClass + " bg-transparent select-none animate-in fade-in zoom-in-95 duration-300"}>
       <div
         className="max-w-md bg-[#0a0d14]/90 backdrop-blur-xl border border-white/15 rounded-2xl p-4 shadow-2xl relative overflow-hidden"
-        style={{ borderLeft: `4px solid ${accent}`, boxShadow: `0 10px 30px ${accent}25` }}
+        style={{ borderLeft: "4px solid " + accent, boxShadow: "0 10px 30px " + accent + "25" }}
       >
         <div className="flex items-center justify-between gap-3 mb-1.5">
           <div className="flex items-center gap-2">
