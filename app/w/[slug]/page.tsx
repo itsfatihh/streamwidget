@@ -238,6 +238,8 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     color?: string;
   } | null>(null);
 
+  const lastIdRef = useRef<string | null>(null);
+
   const playPingSound = () => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -255,78 +257,94 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     } catch (e) {}
   };
 
+  const applyPin = (rawPin: any) => {
+    if (!rawPin) {
+      if (lastIdRef.current !== null) {
+        lastIdRef.current = null;
+        setPinned(null);
+      }
+      return;
+    }
+
+    const pinId = String(rawPin.id || rawPin.message_id || Date.now());
+    const sender =
+      rawPin.sender?.username ||
+      rawPin.user?.username ||
+      rawPin.author?.username ||
+      'Moderatör';
+    const messageContent =
+      rawPin.content ||
+      rawPin.message?.content ||
+      rawPin.message ||
+      '';
+    const userColor =
+      rawPin.sender?.identity?.color ||
+      rawPin.user?.identity?.color ||
+      accent;
+
+    if (lastIdRef.current !== pinId) {
+      lastIdRef.current = pinId;
+      setPinned({
+        id: pinId,
+        username: sender,
+        content: messageContent,
+        color: userColor,
+      });
+      playPingSound();
+    }
+  };
+
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let keepAlive: any = null;
+    let pollInterval: any = null;
 
-    const startSocket = async () => {
-      let chatroomId = channel === 'itsfatih' ? '1917711' : '';
-
-      if (!chatroomId) {
-        try {
-          const res = await fetch(`https://kick.com/api/v2/channels/${channel}/chatroom`);
-          if (res.ok) {
-            const d = await res.json();
-            chatroomId = String(d.id || '');
-          }
-        } catch (e) {}
-      }
-
-      ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
-
-      ws.onopen = () => {
-        if (chatroomId) {
-          ws?.send(JSON.stringify({
-            event: 'pusher:subscribe',
-            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
-          }));
+    // A. Anlık ve Periyodik API Kontrolü (Kesin Fallback)
+    const checkApi = async () => {
+      try {
+        const res = await fetch(`/api/kick/pinned?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          applyPin(data.pinned);
         }
-        // Fallback kanal aboneliği
-        ws?.send(JSON.stringify({
-          event: 'pusher:subscribe',
-          data: { auth: '', channel: `chatroom_${channel}` }
-        }));
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          const ev = parsed.event || '';
-          
-          if (ev.includes('ChatMessagePinned') || ev.includes('PinnedMessage') || ev.includes('pinned')) {
-            if (ev.includes('Unpinned') || ev.includes('Deleted') || ev.includes('unpin')) {
-              setPinned(null);
-              return;
-            }
-
-            const payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
-            const message = payload.message || payload.pinned_message || payload;
-            
-            setPinned({
-              id: String(message.id || Date.now()),
-              username: message.sender?.username || message.user?.username || 'Moderatör',
-              content: message.content || message.message || '',
-              color: message.sender?.identity?.color || accent,
-            });
-            playPingSound();
-          } else if (ev.includes('ChatMessageUnpinned') || ev.includes('PinnedMessageDeleted')) {
-            setPinned(null);
-          }
-        } catch (err) {}
-      };
-
-      keepAlive = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
-        }
-      }, 25000);
+      } catch (err) {}
     };
 
-    startSocket();
+    checkApi();
+    pollInterval = setInterval(checkApi, 2500);
+
+    // B. WebSocket Bağlantısı (Anlık Pusher)
+    const chatroomId = channel === 'itsfatih' ? '1917711' : '';
+    ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
+
+    ws.onopen = () => {
+      const cid = chatroomId || '1917711';
+      ws?.send(JSON.stringify({
+        event: 'pusher:subscribe',
+        data: { auth: '', channel: `chatrooms.${cid}.v2` }
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        const ev = parsed.event || '';
+
+        if (ev.includes('ChatMessagePinned') || ev.includes('PinnedMessage') || ev.includes('pinned')) {
+          if (ev.includes('Unpin') || ev.includes('Deleted')) {
+            applyPin(null);
+            return;
+          }
+          const payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
+          applyPin(payload.pinned_message || payload.message || payload);
+        } else if (ev.includes('ChatMessageUnpinned') || ev.includes('PinnedMessageDeleted')) {
+          applyPin(null);
+        }
+      } catch (e) {}
+    };
 
     return () => {
       if (ws) ws.close();
-      if (keepAlive) clearInterval(keepAlive);
+      if (pollInterval) clearInterval(pollInterval);
     };
   }, [channel]);
 
