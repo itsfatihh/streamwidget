@@ -238,6 +238,8 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     color?: string;
   } | null>(null);
 
+  const [wsStatus, setWsStatus] = useState<string>("Baglaniyor...");
+
   const playPingSound = () => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -259,72 +261,89 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     let ws: WebSocket | null = null;
     let keepAlive: any = null;
 
-    const chatroomId = "1917711";
+    const startPusher = async () => {
+      let chatroomId = "1917711";
 
-    ws = new WebSocket("wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false");
-
-    ws.onopen = () => {
-      ws?.send(JSON.stringify({
-        event: "pusher:subscribe",
-        data: { auth: "", channel: "chatrooms." + chatroomId + ".v2" }
-      }));
-    };
-
-    ws.onmessage = (event) => {
       try {
-        const parsed = JSON.parse(event.data);
-
-        // 1. Kick Resmi Pinned Event
-        if (parsed.event && parsed.event.toLowerCase().includes("pinned")) {
-          if (parsed.event.toLowerCase().includes("unpin") || parsed.event.toLowerCase().includes("delete")) {
-            setPinned(null);
-            return;
-          }
-          const pData = typeof parsed.data === "string" ? JSON.parse(parsed.data) : parsed.data;
-          const msg = pData.message || pData.pinned_message || pData;
-          setPinned({
-            id: String(msg.id || Date.now()),
-            username: msg.sender?.username || msg.user?.username || "Moderator",
-            content: msg.content || msg.message || "",
-            color: msg.sender?.identity?.color || accent,
-          });
-          playPingSound();
-          return;
+        const res = await fetch("https://kick.com/api/v2/channels/" + channel + "/chatroom");
+        if (res.ok) {
+          const d = await res.json();
+          if (d.id) chatroomId = String(d.id);
         }
+      } catch (e) {}
 
-        // 2. Chat Komut Dinleyicisi
-        if (parsed.event === "App\\Events\\ChatMessageEvent") {
-          const msgData = typeof parsed.data === "string" ? JSON.parse(parsed.data) : parsed.data;
-          const raw = (msgData.content || "").trim();
-          const sender = msgData.sender?.username || "Yayinci";
-          const color = msgData.sender?.identity?.color || accent;
+      ws = new WebSocket("wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false");
 
-          if (raw.toLowerCase() === "!unpin" || raw.toLowerCase() === "!pinkaldir") {
-            setPinned(null);
+      ws.onopen = () => {
+        setWsStatus("Baglandi");
+        ws?.send(JSON.stringify({
+          event: "pusher:subscribe",
+          data: { auth: "", channel: "chatrooms." + chatroomId + ".v2" }
+        }));
+      };
+
+      ws.onerror = () => setWsStatus("Hata");
+      ws.onclose = () => setWsStatus("Kapandi");
+
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          const ev = parsed.event || "";
+
+          // 1. Kick Resmi Sabitleme Eventleri
+          if (ev.toLowerCase().includes("pinned")) {
+            if (ev.toLowerCase().includes("unpin") || ev.toLowerCase().includes("delete")) {
+              setPinned(null);
+              return;
+            }
+            const pData = typeof parsed.data === "string" ? JSON.parse(parsed.data) : parsed.data;
+            const msg = pData.message || pData.pinned_message || pData;
+            setPinned({
+              id: String(msg.id || Date.now()),
+              username: msg.sender?.username || msg.user?.username || "Moderator",
+              content: msg.content || msg.message || "",
+              color: msg.sender?.identity?.color || accent,
+            });
+            playPingSound();
             return;
           }
 
-          if (raw.toLowerCase().startsWith("!pin ")) {
-            const text = raw.substring(5).trim();
-            if (text) {
-              setPinned({
-                id: String(msgData.id || Date.now()),
-                username: sender,
-                content: text,
-                color: color,
-              });
-              playPingSound();
+          // 2. Chat Mesajlari (!pin ve !unpin)
+          if (ev.includes("ChatMessageEvent")) {
+            const msgData = typeof parsed.data === "string" ? JSON.parse(parsed.data) : parsed.data;
+            const raw = (msgData.content || "").trim();
+            const sender = msgData.sender?.username || "Yayinci";
+            const color = msgData.sender?.identity?.color || accent;
+
+            if (raw.toLowerCase() === "!unpin" || raw.toLowerCase() === "!pinkaldir") {
+              setPinned(null);
+              return;
+            }
+
+            if (raw.toLowerCase().startsWith("!pin")) {
+              const text = raw.replace(/^!pin\s*/i, "").trim();
+              if (text) {
+                setPinned({
+                  id: String(msgData.id || Date.now()),
+                  username: sender,
+                  content: text,
+                  color: color,
+                });
+                playPingSound();
+              }
             }
           }
+        } catch (err) {}
+      };
+
+      keepAlive = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ event: "pusher:ping", data: {} }));
         }
-      } catch (err) {}
+      }, 20000);
     };
 
-    keepAlive = setInterval(() => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ event: "pusher:ping", data: {} }));
-      }
-    }, 25000);
+    startPusher();
 
     return () => {
       if (ws) ws.close();
@@ -332,7 +351,15 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     };
   }, [channel]);
 
-  if (!pinned) return <div className="w-screen h-screen bg-transparent" />;
+  if (!pinned) {
+    return (
+      <div className="w-screen h-screen bg-transparent p-2">
+        <span className="text-[10px] font-mono text-white/20 opacity-0 hover:opacity-100 transition-opacity">
+          Soket: {wsStatus} ({channel})
+        </span>
+      </div>
+    );
+  }
 
   const posClass =
     position === "top-right"
