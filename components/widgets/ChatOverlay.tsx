@@ -4,138 +4,180 @@ import React, { useState, useEffect, useRef } from 'react';
 
 interface ChatMessage {
   id: string;
-  sender: string;
-  color: string;
+  sender: {
+    username: string;
+    identity?: {
+      color?: string;
+      badges?: Array<{ type: string; text?: string; count?: number }>;
+    };
+  };
   content: string;
-  badges: Array<{ type: string; text?: string }>;
+  created_at?: string;
 }
 
 export default function ChatOverlayWidget({ searchParams }: { searchParams: Record<string, any> }) {
-  const channel = (searchParams?.channel || 'itsfatih').toLowerCase().trim();
+  const channel = searchParams?.channel || 'itsfatih';
   const theme = searchParams?.theme || 'dark';
-  const fontSize = searchParams?.fontSize || 'medium';
+  const fontSize = searchParams?.font_size || '14';
+  const showBadges = searchParams?.show_badges !== 'false';
+  const fadeTimeout = parseInt(searchParams?.fade_timeout || '0', 10);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  // Kick Emote Parser: [emote:12345:emoteName] -> <img src="https://files.kick.com/emotes/12345/fullsize" />
+  const renderMessageContent = (content: string) => {
+    if (!content) return null;
+
+    const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_-]+)\]/g;
+    const parts: (string | React.ReactNode)[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = emoteRegex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+
+      const emoteId = match[1];
+      const emoteName = match[2];
+
+      parts.push(
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={`${emoteId}-${match.index}`}
+          src={`https://files.kick.com/emotes/${emoteId}/fullsize`}
+          alt={emoteName}
+          title={emoteName}
+          className="inline-block align-middle mx-1 my-0.5 max-h-[1.5em] w-auto select-none object-contain"
+          onError={(e) => {
+            // Yedek fallback URL
+            const target = e.currentTarget;
+            if (!target.src.includes('static-files.kick.com')) {
+              target.src = `https://static-files.kick.com/emotes/${emoteId}/fullsize`;
+            }
+          }}
+        />
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : content;
+  };
 
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let pingInterval: any = null;
     let isCancelled = false;
 
-    const connectKickChat = async () => {
-      let chatroomId = '';
+    async function initPusher() {
       try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.chatroom_id) chatroomId = String(data.chatroom_id);
-        }
-      } catch (e) {}
+        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`);
+        const data = await res.json();
+        const chatroomId = data?.chatroom?.id;
 
-      if (isCancelled || !chatroomId) return;
+        if (!chatroomId || isCancelled) return;
 
-      ws = new WebSocket(
-        'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0-rc2&flash=false'
-      );
+        ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f28308142977d07?protocol=7&client=js&version=7.6.0&flash=false');
 
-      const subscribe = () => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(
+        ws.onopen = () => {
+          ws?.send(
             JSON.stringify({
               event: 'pusher:subscribe',
               data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
             })
           );
-        }
-      };
+        };
 
-      ws.onopen = () => subscribe();
+        ws.onmessage = (event) => {
+          try {
+            const parsed = JSON.parse(event.data);
+            if (parsed.event === 'App\\Events\\ChatMessageEvent') {
+              const msgData = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
 
-      ws.onmessage = (event) => {
-        if (isCancelled) return;
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.event === 'pusher:connection_established') {
-            subscribe();
-          }
+              setMessages((prev) => {
+                const updated = [...prev, msgData];
+                return updated.slice(-40);
+              });
+            }
+          } catch (e) {}
+        };
+      } catch (err) {}
+    }
 
-          if (payload.event === 'App\\Events\\ChatMessageEvent') {
-            const msgData = JSON.parse(payload.data);
-            const newMsg: ChatMessage = {
-              id: msgData.id || Math.random().toString(),
-              sender: msgData.sender?.username || 'Anon',
-              color: msgData.sender?.identity?.color || '#53FC18',
-              content: msgData.content || '',
-              badges: msgData.sender?.identity?.badges || [],
-            };
-
-            setMessages((prev) => {
-              const updated = [...prev, newMsg];
-              return updated.slice(-30);
-            });
-          }
-        } catch (err) {}
-      };
-
-      pingInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
-        }
-      }, 15000);
-    };
-
-    connectKickChat();
+    initPusher();
 
     return () => {
       isCancelled = true;
       if (ws) ws.close();
-      if (pingInterval) clearInterval(pingInterval);
     };
   }, [channel]);
 
+  // Yeni mesaj geldikçe otomatik aşağı kaydır
   useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sizeClasses =
-    fontSize === 'small' ? 'text-xs leading-relaxed' : fontSize === 'large' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed';
+  const isLight = theme === 'light';
 
   return (
-    <div className="w-screen h-screen flex flex-col justify-end p-6 bg-transparent select-none font-sans overflow-hidden">
-      <div
-        ref={containerRef}
-        className="w-full max-w-md flex flex-col gap-2 overflow-y-auto max-h-[90vh] no-scrollbar scroll-smooth"
-      >
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`transition-all duration-300 rounded-xl p-3 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 ${
-              theme === 'neon'
-                ? 'bg-black/70 border border-emerald-500/30 shadow-[0_0_15px_rgba(52,211,153,0.15)]'
-                : theme === 'minimal'
-                ? 'bg-black/40 border-0'
-                : 'bg-[#0b0e14]/85 border border-white/10 shadow-xl'
-            }`}
-          >
-            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-              {msg.badges.map((b, i) => (
-                <span
-                  key={i}
-                  className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-white/10 text-emerald-400 font-mono tracking-wider"
-                >
-                  {b.type}
-                </span>
-              ))}
-              <span className="font-extrabold tracking-wide" style={{ color: msg.color }}>
-                {msg.sender}:
+    <div
+      className="w-full h-full flex flex-col justify-end p-4 overflow-hidden bg-transparent select-none font-sans"
+      style={{ fontSize: `${fontSize}px` }}
+    >
+      <div className="flex flex-col gap-2 overflow-y-auto no-scrollbar">
+        {messages.length === 0 && (
+          <div className="text-white/40 text-xs italic px-3 py-2">
+            Kick sohbeti bekleniyor ({channel})...
+          </div>
+        )}
+
+        {messages.map((msg, index) => {
+          const userColor = msg.sender?.identity?.color || '#00e701';
+
+          return (
+            <div
+              key={msg.id || index}
+              className={`flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl border backdrop-blur-md shadow-md animate-[fadeIn_0.2s_ease-out] ${
+                isLight
+                  ? 'bg-white/85 border-black/5 text-slate-900 shadow-slate-200/50'
+                  : 'bg-[#0b0e14]/85 border-white/10 text-white shadow-black/40'
+              }`}
+            >
+              {/* Rozetler */}
+              {showBadges && msg.sender?.identity?.badges && (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {msg.sender.identity.badges.map((b, i) => (
+                    <span
+                      key={i}
+                      className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase tracking-wider bg-white/15 text-white border border-white/10"
+                    >
+                      {b.type}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Kullanıcı Adı */}
+              <span
+                className="font-black flex-shrink-0"
+                style={{ color: userColor }}
+              >
+                {msg.sender?.username}:
+              </span>
+
+              {/* Mesaj İçeriği + Emote Görselleri */}
+              <span className="font-medium break-words leading-relaxed flex-1 min-w-0">
+                {renderMessageContent(msg.content)}
               </span>
             </div>
-            <p className={`text-white/95 font-medium break-words ${sizeClasses}`}>{msg.content}</p>
-          </div>
-        ))}
+          );
+        })}
+        <div ref={chatBottomRef} />
       </div>
     </div>
   );
