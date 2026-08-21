@@ -12,6 +12,7 @@ export default function HeaderControls({
 }) {
   const [currentLang, setCurrentLang] = useState<LangCode>('en');
   const [isDark, setIsDark] = useState<boolean>(true);
+  const [mounted, setMounted] = useState(false);
 
   const applyTheme = (dark: boolean) => {
     setIsDark(dark);
@@ -19,12 +20,13 @@ export default function HeaderControls({
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');
     } else {
-      document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
     }
   };
 
   useEffect(() => {
+    setMounted(true);
     const savedLang = (localStorage.getItem('sw_lang') as LangCode) || 'en';
     const savedTheme = localStorage.getItem('sw_theme') || 'dark';
 
@@ -44,7 +46,12 @@ export default function HeaderControls({
     const nextDark = !isDark;
     applyTheme(nextDark);
     localStorage.setItem('sw_theme', nextDark ? 'dark' : 'light');
+    window.dispatchEvent(new Event('sw_theme_changed'));
   };
+
+  if (!mounted) {
+    return <div className="h-9 w-32" />;
+  }
 
   return (
     <div className="flex items-center gap-3">
@@ -52,21 +59,32 @@ export default function HeaderControls({
       <select
         value={lang || currentLang}
         onChange={(e) => handleLang(e.target.value as LangCode)}
-        className="bg-black/5 dark:bg-white/10 text-xs font-bold px-3 py-2 rounded-xl border border-black/10 dark:border-white/15 outline-none cursor-pointer text-zinc-900 dark:text-white"
+        className="text-xs font-bold px-3 py-2 rounded-xl border outline-none cursor-pointer transition-colors"
+        style={{
+          backgroundColor: 'var(--bg-input)',
+          borderColor: 'var(--border-color)',
+          color: 'var(--text-main)',
+        }}
       >
         {LANGUAGES.map((l) => (
-          <option key={l.code} value={l.code} className="bg-zinc-900 text-white">
+          <option key={l.code} value={l.code} className="bg-[#18181b] text-white">
             {l.flag} {l.label}
           </option>
         ))}
       </select>
 
-      {/* Tema Butonu */}
+      {/* Tema Değiştirici */}
       <button
         onClick={toggleTheme}
-        className="p-2 px-3 rounded-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 hover:border-emerald-500 text-xs font-bold transition-all text-zinc-900 dark:text-white flex items-center gap-1.5"
+        className="px-3.5 py-2 rounded-xl border text-xs font-bold transition-all flex items-center gap-2 hover:opacity-80 active:scale-95 cursor-pointer"
+        style={{
+          backgroundColor: 'var(--bg-input)',
+          borderColor: 'var(--border-color)',
+          color: 'var(--text-main)',
+        }}
       >
-        <span>{isDark ? '☀️ Aydınlık' : '🌙 Karanlık'}</span>
+        <span>{isDark ? '☀️' : '🌙'}</span>
+        <span>{isDark ? 'Aydınlık' : 'Karanlık'}</span>
       </button>
     </div>
   );
