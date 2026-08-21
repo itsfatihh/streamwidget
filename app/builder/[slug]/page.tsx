@@ -14,6 +14,16 @@ import SubCounterWidget from '@/components/widgets/SubCounter';
 import NowPlayingWidget from '@/components/widgets/NowPlaying';
 import QrTipWidget from '@/components/widgets/QrTip';
 
+const LANGUAGES = [
+  { code: 'tr', label: 'TR' },
+  { code: 'en', label: 'EN' },
+  { code: 'de', label: 'DE' },
+  { code: 'es', label: 'ES' },
+  { code: 'fr', label: 'FR' },
+  { code: 'pt', label: 'PT' },
+  { code: 'ru', label: 'RU' },
+];
+
 export default function BuilderPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -24,6 +34,27 @@ export default function BuilderPage() {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
   const [lang, setLang] = useState('tr');
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+
+  // Tarayıcıdan kayıtlı dil ve tema tercihini yükle
+  useEffect(() => {
+    const savedLang = localStorage.getItem('sw_lang');
+    if (savedLang) setLang(savedLang);
+
+    const savedTheme = localStorage.getItem('sw_theme') as 'dark' | 'light';
+    if (savedTheme) setThemeMode(savedTheme);
+  }, []);
+
+  const changeLanguage = (l: string) => {
+    setLang(l);
+    localStorage.setItem('sw_lang', l);
+  };
+
+  const toggleTheme = () => {
+    const next = themeMode === 'dark' ? 'light' : 'dark';
+    setThemeMode(next);
+    localStorage.setItem('sw_theme', next);
+  };
 
   useEffect(() => {
     if (widget) {
@@ -43,7 +74,7 @@ export default function BuilderPage() {
 
   if (!widget) {
     return (
-      <div className="min-h-screen bg-[#07090e] text-white flex flex-col items-center justify-center p-4">
+      <div className={`min-h-screen flex flex-col items-center justify-center p-4 ${themeMode === 'dark' ? 'bg-[#07090e] text-white' : 'bg-slate-50 text-slate-900'}`}>
         <h1 className="text-2xl font-black mb-4">Widget Bulunamadı</h1>
         <Link href="/" className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all">
           Ana Sayfaya Dön
@@ -67,28 +98,56 @@ export default function BuilderPage() {
   };
 
   const isSpotifyConnected = !!(formValues['refresh_token'] || searchParams.get('spotify_connected'));
+  const isDark = themeMode === 'dark';
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-emerald-500 selection:text-black">
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-emerald-500 selection:text-black ${
+      isDark ? 'bg-[#07090e] text-white' : 'bg-slate-100 text-slate-900'
+    }`}>
       {/* Üst Menü */}
-      <header className="w-full border-b border-white/5 bg-[#0b0e14]/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-        <Link href="/" className="flex items-center gap-2 text-white/70 hover:text-white transition-colors">
-          <span className="text-xl">←</span>
-          <span className="font-bold text-sm">Tüm Widgetlar</span>
+      <header className={`w-full border-b backdrop-blur-xl px-6 py-4 flex items-center justify-between sticky top-0 z-50 transition-colors ${
+        isDark ? 'border-white/5 bg-[#0b0e14]/80' : 'border-slate-200 bg-white/80'
+      }`}>
+        <Link href="/" className={`flex items-center gap-2 font-bold text-sm transition-colors ${
+          isDark ? 'text-white/70 hover:text-white' : 'text-slate-600 hover:text-slate-950'
+        }`}>
+          <span className="text-lg">←</span>
+          <span>{lang === 'tr' ? 'Tüm Widgetlar' : 'All Widgets'}</span>
         </Link>
 
-        <div className="flex items-center gap-2">
-          {['tr', 'en', 'de'].map((l) => (
-            <button
-              key={l}
-              onClick={() => setLang(l)}
-              className={`px-2.5 py-1 text-xs font-black uppercase rounded-lg transition-all ${
-                lang === l ? 'bg-white/15 text-white border border-white/20' : 'text-white/40 hover:text-white/80'
-              }`}
-            >
-              {l}
-            </button>
-          ))}
+        {/* Sağ Kontroller: Dil ve Tema Butonları */}
+        <div className="flex items-center gap-3">
+          {/* 7 Dil Seçeneği */}
+          <div className={`flex items-center p-1 rounded-xl border ${
+            isDark ? 'bg-white/5 border-white/10' : 'bg-slate-200/70 border-slate-300'
+          }`}>
+            {LANGUAGES.map((item) => (
+              <button
+                key={item.code}
+                onClick={() => changeLanguage(item.code)}
+                className={`px-2 py-1 text-[11px] font-black uppercase rounded-lg transition-all ${
+                  lang === item.code
+                    ? 'bg-emerald-500 text-black shadow-sm'
+                    : isDark ? 'text-white/50 hover:text-white' : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Aydınlık / Karanlık Mod Butonu */}
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle Theme"
+            className={`p-2 rounded-xl border text-sm font-bold transition-all flex items-center justify-center ${
+              isDark
+                ? 'bg-white/5 border-white/10 text-yellow-400 hover:bg-white/10'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm'
+            }`}
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
         </div>
       </header>
 
@@ -96,32 +155,40 @@ export default function BuilderPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Sol Panel: Ayarlar */}
-        <div className="lg:col-span-5 flex flex-col gap-6 bg-[#0b0e14]/90 border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl backdrop-blur-2xl">
+        <div className={`lg:col-span-5 flex flex-col gap-6 rounded-3xl p-6 md:p-8 shadow-2xl border backdrop-blur-2xl transition-colors ${
+          isDark ? 'bg-[#0b0e14]/90 border-white/10' : 'bg-white border-slate-200 text-slate-900 shadow-slate-200/50'
+        }`}>
           <div>
-            <span className="text-[10px] font-mono font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="text-[10px] font-mono font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
               {widget.category}
             </span>
-            <h1 className="text-2xl font-black tracking-tight mt-3 text-white">
+            <h1 className="text-2xl font-black tracking-tight mt-3">
               {widget.name[lang] || widget.name['tr']}
             </h1>
-            <p className="text-xs text-white/60 font-medium mt-1 leading-relaxed">
+            <p className={`text-xs font-medium mt-1 leading-relaxed ${isDark ? 'text-white/60' : 'text-slate-500'}`}>
               {widget.description[lang] || widget.description['tr']}
             </p>
           </div>
 
           {/* Spotify Giriş Butonu */}
           {slug === 'now-playing' && (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col gap-2.5">
+            <div className={`p-4 rounded-2xl border flex flex-col gap-2.5 ${
+              isDark ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-400">Yöntem 1: Tek Tıkla Bağlan (Önerilen)</span>
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  {lang === 'tr' ? 'Yöntem 1: Tek Tıkla Bağlan (Önerilen)' : 'Method 1: One-Click Connect'}
+                </span>
                 {isSpotifyConnected && (
-                  <span className="text-[10px] font-mono font-black text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                  <span className="text-[10px] font-mono font-black text-emerald-500 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30">
                     BAĞLANDI ✓
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-white/70 leading-normal">
-                Aşağıdaki butona tıklayıp onay vermeniz yeterlidir. Token kutusunu elle doldurmanıza gerek kalmaz, sistem linkinizi otomatik oluşturur.
+              <p className={`text-[11px] leading-normal ${isDark ? 'text-white/70' : 'text-slate-600'}`}>
+                {lang === 'tr'
+                  ? 'Aşağıdaki butona tıklayıp onay vermeniz yeterlidir. Sistem linkinizi otomatik oluşturur.'
+                  : 'Click the button below and authorize. The system will automatically configure your widget.'}
               </p>
               <a
                 href={`/api/auth/spotify?channel=${encodeURIComponent(formValues['channel'] || 'itsfatih')}`}
@@ -136,20 +203,24 @@ export default function BuilderPage() {
           <div className="flex flex-col gap-4">
             {slug === 'now-playing' && (
               <div className="flex items-center gap-2 my-1">
-                <div className="h-[1px] bg-white/10 flex-1" />
-                <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">veya manuel ayarlar</span>
-                <div className="h-[1px] bg-white/10 flex-1" />
+                <div className={`h-[1px] flex-1 ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
+                <span className={`text-[10px] font-mono uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                  {lang === 'tr' ? 'veya manuel ayarlar' : 'or manual settings'}
+                </span>
+                <div className={`h-[1px] flex-1 ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
               </div>
             )}
 
             {widget.fields.map((field) => (
               <div key={field.name} className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-white/70">
+                  <label className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white/70' : 'text-slate-700'}`}>
                     {field.label[lang] || field.label['tr']}
                   </label>
                   {field.name === 'refresh_token' && (
-                    <span className="text-[10px] text-white/40 font-mono">Otomatik doldurulur</span>
+                    <span className={`text-[10px] font-mono ${isDark ? 'text-white/40' : 'text-slate-400'}`}>
+                      Otomatik doldurulur
+                    </span>
                   )}
                 </div>
 
@@ -157,16 +228,20 @@ export default function BuilderPage() {
                   <select
                     value={formValues[field.name] || field.defaultValue}
                     onChange={(e) => handleChange(field.name, e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white font-medium focus:outline-none focus:border-emerald-500/50 transition-colors"
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-sm font-medium border focus:outline-none focus:border-emerald-500 transition-colors ${
+                      isDark ? 'bg-black/50 border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
                   >
                     {field.options?.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-[#0b0e14] text-white">
+                      <option key={opt.value} value={opt.value} className={isDark ? 'bg-[#0b0e14] text-white' : 'bg-white text-slate-900'}>
                         {opt.label[lang] || opt.label['tr']}
                       </option>
                     ))}
                   </select>
                 ) : field.type === 'color' ? (
-                  <div className="flex items-center gap-3 bg-black/50 border border-white/10 rounded-xl p-2">
+                  <div className={`flex items-center gap-3 rounded-xl p-2 border ${
+                    isDark ? 'bg-black/50 border-white/10' : 'bg-slate-50 border-slate-200'
+                  }`}>
                     <input
                       type="color"
                       value={formValues[field.name] || field.defaultValue}
@@ -177,7 +252,7 @@ export default function BuilderPage() {
                       type="text"
                       value={formValues[field.name] || field.defaultValue}
                       onChange={(e) => handleChange(field.name, e.target.value)}
-                      className="flex-1 bg-transparent text-sm font-mono text-white focus:outline-none"
+                      className={`flex-1 bg-transparent text-sm font-mono focus:outline-none ${isDark ? 'text-white' : 'text-slate-900'}`}
                     />
                   </div>
                 ) : (
@@ -186,7 +261,9 @@ export default function BuilderPage() {
                     placeholder={field.name === 'refresh_token' ? 'Spotify ile bağlandığınızda buraya otomatik gelir' : ''}
                     value={formValues[field.name] !== undefined ? formValues[field.name] : field.defaultValue}
                     onChange={(e) => handleChange(field.name, e.target.value)}
-                    className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white font-medium focus:outline-none focus:border-emerald-500/50 transition-colors"
+                    className={`w-full rounded-xl px-3.5 py-2.5 text-sm font-medium border focus:outline-none focus:border-emerald-500 transition-colors ${
+                      isDark ? 'bg-black/50 border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
                   />
                 )}
               </div>
@@ -194,8 +271,8 @@ export default function BuilderPage() {
           </div>
 
           {/* OBS Link Alanı */}
-          <div className="flex flex-col gap-2 pt-2 border-t border-white/5">
-            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-white/50">
+          <div className={`flex flex-col gap-2 pt-2 border-t ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
+            <span className={`text-[11px] font-mono font-bold uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-slate-500'}`}>
               OBS TARAYICI KAYNAĞI LİNKİ
             </span>
             <div className="flex items-center gap-2">
@@ -203,13 +280,15 @@ export default function BuilderPage() {
                 type="text"
                 readOnly
                 value={obsUrl}
-                className="flex-1 bg-black/70 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs font-mono text-white/70 truncate select-all focus:outline-none"
+                className={`flex-1 rounded-xl px-3.5 py-2.5 text-xs font-mono truncate select-all border focus:outline-none ${
+                  isDark ? 'bg-black/70 border-white/10 text-white/70' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}
               />
               <button
                 onClick={copyToClipboard}
                 className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap shadow-lg ${
                   copied
-                    ? 'bg-white text-black'
+                    ? 'bg-black text-white dark:bg-white dark:text-black'
                     : 'bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold shadow-emerald-500/20'
                 }`}
               >
@@ -219,10 +298,10 @@ export default function BuilderPage() {
           </div>
         </div>
 
-        {/* Sağ Panel: Canlı Önizleme & Açıklama */}
+        {/* Sağ Panel: Canlı Önizleme */}
         <div className="lg:col-span-7 flex flex-col gap-4">
           <div className="flex items-center justify-between px-2">
-            <span className="text-[11px] font-mono font-black uppercase tracking-widest text-white/40">
+            <span className={`text-[11px] font-mono font-black uppercase tracking-widest ${isDark ? 'text-white/40' : 'text-slate-500'}`}>
               CANLI ÖNİZLEME
             </span>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -242,22 +321,24 @@ export default function BuilderPage() {
 
           {/* Token Rehberi (Sadece Now Playing için) */}
           {slug === 'now-playing' && (
-            <div className="bg-[#0b0e14]/90 border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col gap-3">
+            <div className={`rounded-3xl p-6 shadow-xl border flex flex-col gap-3 transition-colors ${
+              isDark ? 'bg-[#0b0e14]/90 border-white/10 text-white/70' : 'bg-white border-slate-200 text-slate-600 shadow-slate-200/50'
+            }`}>
               <div className="flex items-center gap-2">
                 <span className="text-sm">💡</span>
-                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   Spotify Bağlantısı ve Token Hakkında Bilgi
                 </span>
               </div>
-              <ul className="text-xs text-white/70 space-y-2 leading-relaxed list-disc list-inside">
+              <ul className="text-xs space-y-2 leading-relaxed list-disc list-inside">
                 <li>
-                  <strong className="text-white">İkisini de yapmanız gerekmez:</strong> Sol taraftaki yeşil <span className="text-emerald-400 font-semibold">"Spotify ile Bağlan"</span> butonuna bastığınızda oturum anahtarınız otomatik alınır ve linkinize eklenir.
+                  <strong className={isDark ? 'text-white' : 'text-slate-900'}>İkisini de yapmanız gerekmez:</strong> Sol taraftaki yeşil <span className="text-emerald-500 font-semibold">"Spotify ile Bağlan"</span> butonuna bastığınızda oturum anahtarınız otomatik alınır ve linkinize eklenir.
                 </li>
                 <li>
-                  <strong className="text-white">Token Nerede?:</strong> Başarılı girişten sonra oluşan özel oturum anahtarı formdaki <span className="text-emerald-400 font-mono">refresh_token</span> alanına otomatik işlenir.
+                  <strong className={isDark ? 'text-white' : 'text-slate-900'}>Token Nerede?:</strong> Başarılı girişten sonra oluşan özel oturum anahtarı formdaki <span className="text-emerald-500 font-mono">refresh_token</span> alanına otomatik işlenir.
                 </li>
                 <li>
-                  <strong className="text-white">Manuel Kullanım:</strong> Başka bir araçtan veya Spotify Developer panelinden aldığınız kendi Refresh Token kodunuz varsa, butona basmadan doğrudan formdaki kutuya yapıştırıp OBS linkinizi oluşturabilirsiniz.
+                  <strong className={isDark ? 'text-white' : 'text-slate-900'}>Manuel Kullanım:</strong> Başka bir araçtan veya Spotify Developer panelinden aldığınız kendi Refresh Token kodunuz varsa, butona basmadan doğrudan formdaki kutuya yapıştırıp OBS linkinizi oluşturabilirsiniz.
                 </li>
               </ul>
             </div>
