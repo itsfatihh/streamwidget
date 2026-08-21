@@ -24,51 +24,49 @@ function GpsTrackerContent() {
     accuracy: 0,
   });
   const [lastSent, setLastSent] = useState<string>('--');
-  const [wakeLock, setWakeLock] = useState<boolean>(false);
-
   const watchIdRef = useRef<number | null>(null);
 
-  // Ekranın kapanmasını engelle (Wake Lock API)
+  // Ekran kararmasını önle
   useEffect(() => {
-    const requestWakeLock = async () => {
-      if ('wakeLock' in navigator && isTracking) {
-        try {
-          await (navigator as any).wakeLock.request('screen');
-          setWakeLock(true);
-        } catch (e) {
-          console.warn('Wake Lock alınamadı', e);
-        }
-      }
-    };
-    if (isTracking) requestWakeLock();
+    if ('wakeLock' in navigator && isTracking) {
+      (navigator as any).wakeLock.request('screen').catch(() => {});
+    }
   }, [isTracking]);
 
   const sendLocation = async (lat: number, lng: number, speed: number, heading: number) => {
+    const payload = JSON.stringify({
+      channel: session.toLowerCase().trim(),
+      lat,
+      lng,
+      speed,
+      heading,
+      time: Date.now(),
+    });
+
     try {
-      const res = await fetch('/api/gps', {
+      // 1. Anlık PubSub Rölesi
+      fetch(`https://ntfy.sh/sw_gps_${session.toLowerCase().trim()}`, {
+        method: 'POST',
+        body: payload,
+      }).catch(() => {});
+
+      // 2. Yedek API
+      fetch('/api/gps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          channel: session.trim(),
-          session: session.trim(),
-          lat,
-          lng,
-          speed,
-          heading,
-        }),
-      });
-      if (res.ok) {
-        setLastSent(new Date().toLocaleTimeString('tr-TR'));
-        setStatus('Canlı Gönderiliyor');
-      }
+        body: payload,
+      }).catch(() => {});
+
+      setLastSent(new Date().toLocaleTimeString('tr-TR'));
+      setStatus('Canlı Gönderiliyor 🚀');
     } catch (e) {
-      setStatus('Bağlantı Hatası');
+      setStatus('Gönderim Hatası');
     }
   };
 
   const startTracking = () => {
     if (!navigator.geolocation) {
-      alert('Cihazınızda GPS desteği bulunamadı.');
+      alert('GPS desteği bulunamadı.');
       return;
     }
 
@@ -79,29 +77,15 @@ function GpsTrackerContent() {
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        // m/s -> km/h dönüşümü
         const speedKmh = pos.coords.speed !== null && pos.coords.speed >= 0 ? Math.round(pos.coords.speed * 3.6) : 0;
         const headingDeg = pos.coords.heading !== null && !isNaN(pos.coords.heading) ? Math.round(pos.coords.heading) : 0;
         const accuracy = Math.round(pos.coords.accuracy || 0);
 
-        setGpsData({
-          lat,
-          lng,
-          speed: speedKmh,
-          heading: headingDeg,
-          accuracy,
-        });
-
+        setGpsData({ lat, lng, speed: speedKmh, heading: headingDeg, accuracy });
         sendLocation(lat, lng, speedKmh, headingDeg);
       },
-      (err) => {
-        setStatus(`GPS Hatası: ${err.message}`);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
+      (err) => setStatus(`GPS Hatası: ${err.message}`),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
@@ -128,7 +112,7 @@ function GpsTrackerContent() {
       </header>
 
       <main className="w-full max-w-md my-auto space-y-6">
-        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 space-y-4">
+        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 space-y-3">
           <label className="text-xs font-bold text-white/60 uppercase tracking-wider block">Oturum / Kanal Adı</label>
           <input
             type="text"
@@ -147,9 +131,9 @@ function GpsTrackerContent() {
             <span className="text-[10px] text-white/50 font-bold">KM/H</span>
           </div>
           <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-4 text-center">
-            <span className="text-[10px] font-bold text-white/40 uppercase">Pusula / Yön</span>
+            <span className="text-[10px] font-bold text-white/40 uppercase">Pusula Açısı</span>
             <div className="text-3xl font-black font-mono text-white mt-1">{gpsData.heading}°</div>
-            <span className="text-[10px] text-white/50 font-bold">AÇI</span>
+            <span className="text-[10px] text-white/50 font-bold">YÖN</span>
           </div>
         </div>
 
@@ -185,7 +169,7 @@ function GpsTrackerContent() {
       </main>
 
       <footer className="w-full max-w-md text-center py-3 text-[11px] text-white/30 border-t border-white/5">
-        StreamWidget GPS Transmitter • Açık Tutunuz
+        StreamWidget GPS Transmitter • Arka Planda Açık Tutunuz
       </footer>
     </div>
   );

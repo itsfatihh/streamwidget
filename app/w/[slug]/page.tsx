@@ -66,7 +66,7 @@ function ClockWidget() {
 }
 
 function MiniMapWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
-  const channel = searchParams.channel || 'itsfatih';
+  const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
   const shape = searchParams.shape || 'circle';
   const accent = searchParams.accent || '#53FC18';
   const showSpeed = searchParams.showSpeed !== 'false';
@@ -81,29 +81,63 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
 
-  // GPS Verisi Çekme
+  // Canlı GPS Dinleyicisi (SSE + Polling Fallback)
   useEffect(() => {
-    const fetchGPS = async () => {
+    let eventSource: EventSource | null = null;
+
+    try {
+      eventSource = new EventSource(`https://ntfy.sh/sw_gps_${channel}/sse`);
+      eventSource.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed && parsed.message) {
+            const data = JSON.parse(parsed.message);
+            if (data.lat && data.lng) {
+              setPos({
+                lat: Number(data.lat),
+                lng: Number(data.lng),
+                speed: Math.round(Number(data.speed || 0)),
+                heading: Number(data.heading || 0),
+              });
+              setStatus('live');
+            }
+          }
+        } catch (e) {}
+      };
+    } catch (e) {}
+
+    // Polling yedek kontrol
+    const pollInterval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/gps?channel=${channel}`);
+        const res = await fetch(`https://ntfy.sh/sw_gps_${channel}/json?poll=1&since=5s`);
         if (res.ok) {
-          const data = await res.json();
-          if (data && data.lat) {
-            setPos({
-              lat: Number(data.lat),
-              lng: Number(data.lng),
-              speed: Math.round(Number(data.speed || 0)),
-              heading: Number(data.heading || 0),
-            });
-            setStatus('live');
+          const text = await res.text();
+          const lines = text.trim().split('\n');
+          for (const line of lines.reverse()) {
+            if (!line) continue;
+            const parsed = JSON.parse(line);
+            if (parsed.message) {
+              const data = JSON.parse(parsed.message);
+              if (data.lat && data.lng) {
+                setPos({
+                  lat: Number(data.lat),
+                  lng: Number(data.lng),
+                  speed: Math.round(Number(data.speed || 0)),
+                  heading: Number(data.heading || 0),
+                });
+                setStatus('live');
+                break;
+              }
+            }
           }
         }
       } catch (e) {}
-    };
+    }, 1500);
 
-    fetchGPS();
-    const interval = setInterval(fetchGPS, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      if (eventSource) eventSource.close();
+      clearInterval(pollInterval);
+    };
   }, [channel]);
 
   // Leaflet Başlatma
@@ -163,7 +197,7 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
     };
   }, []);
 
-  // Koordinat Değişince Haritayı Güncelle
+  // Koordinat Değiştiğinde Harita ve Yön Oku Odaklama
   useEffect(() => {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.setView([pos.lat, pos.lng], 16, { animate: true });
