@@ -238,6 +238,8 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     color?: string;
   } | null>(null);
 
+  const lastPinnedId = useRef<string | null>(null);
+
   const playPingSound = () => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -256,71 +258,45 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
   };
 
   useEffect(() => {
-    let ws: WebSocket | null = null;
-    let keepAlive: any = null;
+    let timer: any = null;
 
-    ws = new WebSocket("wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false");
-
-    ws.onopen = () => {
-      // Kick in kullanabilecegi tum kanal formatlarina tek seferde abone oluyoruz
-      const channelsToSub = [
-        "chatrooms.1917711.v2",
-        "chatrooms.1917711",
-        "channel.1917711",
-        "channel.itsfatih"
-      ];
-      channelsToSub.forEach((ch) => {
-        ws?.send(JSON.stringify({
-          event: "pusher:subscribe",
-          data: { auth: "", channel: ch }
-        }));
-      });
-    };
-
-    ws.onmessage = (event) => {
+    const fetchPinned = async () => {
       try {
-        const parsed = JSON.parse(event.data);
-        const ev = String(parsed.event || "");
+        const res = await fetch("/api/kick/pinned?channel=" + encodeURIComponent(channel), { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
 
-        // 1. Kick Pin Olayi
-        if (ev.toLowerCase().includes("pin") && !ev.toLowerCase().includes("ping")) {
-          if (ev.toLowerCase().includes("unpin") || ev.toLowerCase().includes("delet")) {
-            setPinned(null);
-            return;
-          }
+        if (data.pinned) {
+          const pm = data.pinned;
+          const pId = String(pm.id || pm.message?.id || Date.now());
+          const sender = pm.sender?.username || pm.user?.username || pm.message?.sender?.username || channel;
+          const text = pm.content || pm.message?.content || pm.message || "";
+          const color = pm.sender?.identity?.color || pm.message?.sender?.identity?.color || accent;
 
-          let payload = parsed.data;
-          if (typeof payload === "string") {
-            try { payload = JSON.parse(payload); } catch(e) {}
-          }
-
-          const msg = payload.pinned_message || payload.message || payload;
-          const senderName = msg.sender?.username || msg.user?.username || "Moderatör";
-          const msgText = msg.content || msg.message?.content || msg.message || "";
-          const userColor = msg.sender?.identity?.color || accent;
-
-          if (msgText) {
+          if (lastPinnedId.current !== pId) {
+            lastPinnedId.current = pId;
             setPinned({
-              id: String(msg.id || Date.now()),
-              username: senderName,
-              content: msgText,
-              color: userColor,
+              id: pId,
+              username: sender,
+              content: text,
+              color: color,
             });
             playPingSound();
+          }
+        } else {
+          if (lastPinnedId.current !== null) {
+            lastPinnedId.current = null;
+            setPinned(null);
           }
         }
       } catch (err) {}
     };
 
-    keepAlive = setInterval(() => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ event: "pusher:ping", data: {} }));
-      }
-    }, 20000);
+    fetchPinned();
+    timer = setInterval(fetchPinned, 2000);
 
     return () => {
-      if (ws) ws.close();
-      if (keepAlive) clearInterval(keepAlive);
+      if (timer) clearInterval(timer);
     };
   }, [channel]);
 
