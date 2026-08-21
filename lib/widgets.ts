@@ -24,6 +24,93 @@ export interface WidgetDef {
 
 export const WIDGETS_LIST: WidgetDef[] = [
   {
+    id: 'mini-map',
+    category: 'IRL',
+    name: {
+      tr: 'NFS Mini-Map Radar',
+      en: 'NFS Mini-Map Radar',
+      de: 'NFS Mini-Map Radar',
+      es: 'NFS Mini-Map Radar',
+      pt: 'NFS Mini-Map Radar',
+      ru: 'NFS Мини-карта Радар',
+      ja: 'NFS ミニマップ レーダー',
+      pl: 'NFS Mini-Mapa Radar',
+      ar: 'رادار الخريطة المصغرة NFS',
+    },
+    description: {
+      tr: 'GTA/NFS tarzı canlı radar mini haritası, hız kadranı ve telefondan anlık GPS takibi.',
+      en: 'GTA/NFS style live radar map, speedometer HUD, and instant phone GPS sync.',
+      de: 'Live-Radarkarte im GTA/NFS-Stil, Tacho-HUD und Handy-GPS-Synchronisierung.',
+      es: 'Mapa de radar en vivo estilo GTA/NFS, HUD de velocímetro y sincronización GPS móvil.',
+      pt: 'Mapa de radar ao vivo no estilo GTA/NFS, velocímetro e sincronização GPS móvel.',
+      ru: 'Живая радарная карта в стиле GTA/NFS со спидометром и GPS синхронизацией.',
+      ja: 'GTA/NFSスタイルのライブレーダーマップ、速度計HUD、スマートフォンGPS同期。',
+      pl: 'Radarowa mini-mapa w stylu GTA/NFS, prędkościomierz i synchronizacja GPS z telefonu.',
+      ar: 'خريطة رادار حية بنمط GTA/NFS وعداد سرعة ومزامنة GPS للهاتف المحمول.',
+    },
+    fields: [
+      {
+        name: 'channel',
+        label: {
+          tr: 'Oturum / Kanal Adı',
+          en: 'Session / Channel Name',
+          de: 'Sitzungsname',
+          es: 'Nombre de Sesión',
+          pt: 'Nome da Sessão',
+          ru: 'Имя сессии',
+          ja: 'セッション名',
+          pl: 'Nazwa sesji',
+          ar: 'اسم الجلسة',
+        },
+        type: 'text',
+        defaultValue: 'itsfatih',
+        placeholder: 'itsfatih',
+      },
+      {
+        name: 'shape',
+        label: {
+          tr: 'Harita Şekli',
+          en: 'Map Shape',
+          de: 'Kartenform',
+          es: 'Forma del Mapa',
+          pt: 'Formato do Mapa',
+          ru: 'Форма карты',
+          ja: 'マップの形状',
+          pl: 'Kształt mapy',
+          ar: 'شكل الخريطة',
+        },
+        type: 'select',
+        defaultValue: 'circle',
+        options: [
+          {
+            label: { tr: 'Yuvarlak (NFS/Radar)', en: 'Circle (Radar)', de: 'Kreis', es: 'Círculo', pt: 'Círculo', ru: 'Круг', ja: '円形', pl: 'Okrągły', ar: 'دائري' },
+            value: 'circle',
+          },
+          {
+            label: { tr: 'Kare (GTA/Modern)', en: 'Square (GTA)', de: 'Quadrat', es: 'Cuadrado', pt: 'Quadrado', ru: 'Квадрат', ja: '正方形', pl: 'Kwadratowy', ar: 'مربع' },
+            value: 'square',
+          },
+        ],
+      },
+      {
+        name: 'accent',
+        label: {
+          tr: 'Vurgu Rengi',
+          en: 'Accent Color',
+          de: 'Akzentfarbe',
+          es: 'Color de acento',
+          pt: 'Cor de destaque',
+          ru: 'Цвет акцента',
+          ja: 'アクセントカラー',
+          pl: 'Kolor akcentu',
+          ar: 'لون التمييز',
+        },
+        type: 'color',
+        defaultValue: '#53FC18',
+      },
+    ],
+  },
+  {
     id: 'kick-viewers',
     category: 'Kick',
     name: {
