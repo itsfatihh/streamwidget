@@ -13,22 +13,24 @@ export default function HeaderControls({
   const [currentLang, setCurrentLang] = useState<LangCode>('en');
   const [isDark, setIsDark] = useState<boolean>(true);
 
+  const applyTheme = (dark: boolean) => {
+    setIsDark(dark);
+    if (dark) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
   useEffect(() => {
     const savedLang = (localStorage.getItem('sw_lang') as LangCode) || 'en';
     const savedTheme = localStorage.getItem('sw_theme') || 'dark';
 
     setCurrentLang(savedLang);
     if (onLangChange) onLangChange(savedLang);
-
-    if (savedTheme === 'light') {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
-    } else {
-      setIsDark(true);
-      document.documentElement.classList.remove('light');
-      document.documentElement.classList.add('dark');
-    }
+    applyTheme(savedTheme !== 'light');
   }, []);
 
   const handleLang = (l: LangCode) => {
@@ -40,26 +42,17 @@ export default function HeaderControls({
 
   const toggleTheme = () => {
     const nextDark = !isDark;
-    setIsDark(nextDark);
-    const theme = nextDark ? 'dark' : 'light';
-    localStorage.setItem('sw_theme', theme);
-
-    if (nextDark) {
-      document.documentElement.classList.remove('light');
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.documentElement.classList.add('light');
-    }
+    applyTheme(nextDark);
+    localStorage.setItem('sw_theme', nextDark ? 'dark' : 'light');
   };
 
   return (
     <div className="flex items-center gap-3">
-      {/* Dil Seçici Dropdown */}
+      {/* Dil Seçici */}
       <select
         value={lang || currentLang}
         onChange={(e) => handleLang(e.target.value as LangCode)}
-        className="bg-white/5 dark:bg-white/5 bg-black/5 text-xs font-bold px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/10 outline-none cursor-pointer hover:border-emerald-500 transition-colors text-zinc-900 dark:text-white"
+        className="bg-black/5 dark:bg-white/10 text-xs font-bold px-3 py-2 rounded-xl border border-black/10 dark:border-white/15 outline-none cursor-pointer text-zinc-900 dark:text-white"
       >
         {LANGUAGES.map((l) => (
           <option key={l.code} value={l.code} className="bg-zinc-900 text-white">
@@ -68,13 +61,12 @@ export default function HeaderControls({
         ))}
       </select>
 
-      {/* Tema Değiştirici Buton */}
+      {/* Tema Butonu */}
       <button
         onClick={toggleTheme}
-        className="p-1.5 px-2.5 rounded-xl bg-white/5 dark:bg-white/5 bg-black/5 border border-black/10 dark:border-white/10 hover:border-emerald-500 text-xs font-bold transition-all text-zinc-900 dark:text-white"
-        title="Tema Değiştir"
+        className="p-2 px-3 rounded-xl bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/15 hover:border-emerald-500 text-xs font-bold transition-all text-zinc-900 dark:text-white flex items-center gap-1.5"
       >
-        {isDark ? '☀️' : '🌙'}
+        <span>{isDark ? '☀️ Aydınlık' : '🌙 Karanlık'}</span>
       </button>
     </div>
   );
