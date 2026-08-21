@@ -87,11 +87,10 @@ export const WIDGETS_LIST: WidgetDef[] = [
         name: "theme",
         label: { en: "Theme Style", tr: "Tasarım Teması", es: "Tema", de: "Design-Stil", pt: "Estilo do Tema", fr: "Style de Thème", ru: "Стиль темы" },
         type: "select",
-        defaultValue: "glass",
+        defaultValue: "minimal",
         options: [
-          { label: { en: "Neon Glass (Card)", tr: "Neon Cam (Kartlı)", es: "Vidrio Neón", de: "Neon Glas", pt: "Vidro Neon", fr: "Verre Néon", ru: "Неоновое стекло" }, value: "glass" },
-          { label: { en: "Clean Minimal (Text only)", tr: "Sade Minimal (Sadece Metin)", es: "Minimalista", de: "Minimalistisch", pt: "Minimalista", fr: "Minimaliste", ru: "Минимал" }, value: "minimal" },
-          { label: { en: "Cyber Glow (Border)", tr: "Siber Neon (Çerçeveli)", es: "Resplandor Cyber", de: "Cyber Glow", pt: "Cyber Glow", fr: "Cyber Glow", ru: "Кибер свечение" }, value: "cyber" },
+          { label: { en: "Minimal", tr: "Minimal", es: "Minimalista", de: "Minimalistisch", pt: "Minimalista", fr: "Minimaliste", ru: "Минимал" }, value: "minimal" },
+          { label: { en: "Framed", tr: "Çerçeveli", es: "Enmarcado", de: "Umrahmt", pt: "Com Moldura", fr: "Encadré", ru: "В рамке" }, value: "framed" },
         ],
       },
       {
