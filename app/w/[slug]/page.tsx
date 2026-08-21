@@ -257,110 +257,91 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
 
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let pollTimer: any = null;
+    let keepAlive: any = null;
 
-    const initConnection = async () => {
+    const setupPusher = async () => {
+      // 1. Kick sayfasından chatroom ID'yi doğrudan çekmeyi dene
+      let chatroomId: string | null = null;
+      let channelId: string | null = null;
+
       try {
-        const res = await fetch(`/api/kick/pinned?channel=${encodeURIComponent(channel)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-
-        if (data.pinned_message) {
-          const pm = data.pinned_message;
-          setPinned({
-            id: String(pm.id || Date.now()),
-            username: pm.sender?.username || pm.user?.username || 'Moderatör',
-            content: pm.content || pm.message || '',
-            color: pm.sender?.identity?.color || accent,
-          });
+        const res = await fetch(`https://kick.com/api/v1/channels/${channel}`);
+        if (res.ok) {
+          const data = await res.json();
+          chatroomId = data.chatroom?.id ? String(data.chatroom.id) : null;
+          channelId = data.id ? String(data.id) : null;
+          if (data.pinned_message) {
+            setPinned({
+              id: String(data.pinned_message.id || Date.now()),
+              username: data.pinned_message.sender?.username || 'Moderatör',
+              content: data.pinned_message.content || '',
+              color: data.pinned_message.sender?.identity?.color || accent,
+            });
+          }
         }
+      } catch (e) {}
 
-        const chatroomId = data.chatroom_id;
-        const channelId = data.channel_id;
+      // 2. Pusher Canlı Soket Bağlantısı (Kick Global Cluster)
+      ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
 
-        // Pusher soket bağlantısı
-        ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
+      ws.onopen = () => {
+        // Kick chatroom ve channel kanallarına abone ol
+        if (chatroomId) {
+          ws?.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${chatroomId}.v2` } }));
+        }
+        if (channelId) {
+          ws?.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `channel.${channelId}` } }));
+        }
+      };
 
-        ws.onopen = () => {
-          if (chatroomId) {
-            ws?.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${chatroomId}.v2` } }));
+      ws.onmessage = (event) => {
+        try {
+          const parsed = JSON.parse(event.data);
+          const ev = parsed.event || '';
+
+          // Sabitleme olaylarını yakala
+          if (
+            ev.includes('ChatMessagePinnedEvent') ||
+            ev.includes('PinnedMessageCreatedEvent') ||
+            ev.includes('PinnedMessage') ||
+            ev === 'pinned'
+          ) {
+            const dataObj = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
+            const message = dataObj.message || dataObj.pinned_message || dataObj;
+            
+            setPinned({
+              id: String(message.id || Date.now()),
+              username: message.sender?.username || message.user?.username || 'Moderatör',
+              content: message.content || message.message || '',
+              color: message.sender?.identity?.color || accent,
+            });
+            playPingSound();
+          } 
+          // Sabitleme kaldırma olaylarını yakala
+          else if (
+            ev.includes('ChatMessageUnpinnedEvent') ||
+            ev.includes('PinnedMessageDeletedEvent') ||
+            ev.includes('Unpin') ||
+            ev.includes('unpinned')
+          ) {
+            setPinned(null);
           }
-          if (channelId) {
-            ws?.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `channel.${channelId}` } }));
-          }
-        };
+        } catch (err) {}
+      };
 
-        ws.onmessage = (event) => {
-          try {
-            const parsed = JSON.parse(event.data);
-            const ev = parsed.event || '';
-
-            if (
-              ev.includes('PinnedMessageCreated') ||
-              ev.includes('ChatMessagePinned') ||
-              ev.includes('PinnedMessage') ||
-              ev === 'pinned'
-            ) {
-              if (ev.includes('Deleted') || ev.includes('Unpin') || ev.includes('unpinned')) {
-                setPinned(null);
-                return;
-              }
-
-              const payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
-              const msg = payload.message || payload.pinned_message || payload;
-
-              setPinned({
-                id: String(msg.id || Date.now()),
-                username: msg.sender?.username || msg.user?.username || 'Moderatör',
-                content: msg.content || msg.message || '',
-                color: msg.sender?.identity?.color || accent,
-              });
-              playPingSound();
-            } else if (
-              ev.includes('PinnedMessageDeleted') ||
-              ev.includes('ChatMessageUnpinned') ||
-              ev.includes('UnpinnedMessage')
-            ) {
-              setPinned(null);
-            }
-          } catch (err) {}
-        };
-      } catch (err) {}
+      // Bağlantıyı canlı tutma pingi (30s)
+      keepAlive = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
+        }
+      }, 30000);
     };
 
-    initConnection();
-
-    // 4 saniyede bir yoklama
-    pollTimer = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/kick/pinned?channel=${encodeURIComponent(channel)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-
-        if (!data.pinned_message) {
-          setPinned((prev) => (prev ? null : null));
-        } else {
-          const pm = data.pinned_message;
-          const pId = String(pm.id);
-          setPinned((prev) => {
-            if (!prev || prev.id !== pId) {
-              playPingSound();
-              return {
-                id: pId,
-                username: pm.sender?.username || pm.user?.username || 'Moderatör',
-                content: pm.content || pm.message || '',
-                color: pm.sender?.identity?.color || accent,
-              };
-            }
-            return prev;
-          });
-        }
-      } catch (err) {}
-    }, 4000);
+    setupPusher();
 
     return () => {
       if (ws) ws.close();
-      if (pollTimer) clearInterval(pollTimer);
+      if (keepAlive) clearInterval(keepAlive);
     };
   }, [channel]);
 
