@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 
 export default function GoalBarWidget({ searchParams }: { searchParams: Record<string, any> }) {
   const channel = (searchParams?.channel || 'itsfatih').toLowerCase().trim();
-  const title = searchParams?.title || 'TAKİPÇİ HEDEFİ';
+  const title = searchParams?.title !== undefined && searchParams?.title !== '' ? searchParams.title : 'TAKİPÇİ HEDEFİ';
   const target = Math.max(1, parseInt(searchParams?.target || '1000', 10));
   const color = searchParams?.color || '#22c55e';
 
