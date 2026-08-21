@@ -27,7 +27,6 @@ function GpsTrackerContent() {
   const [lastSent, setLastSent] = useState<string>('--');
   const watchIdRef = useRef<number | null>(null);
 
-  // Ekran kararmasını önle
   useEffect(() => {
     if ('wakeLock' in navigator && isTracking) {
       (navigator as any).wakeLock.request('screen').catch(() => {});
@@ -73,54 +72,42 @@ function GpsTrackerContent() {
 
     setGpsData({ lat, lng, speed: speedKmh, heading: headingDeg, accuracy });
     sendLocation(lat, lng, speedKmh, headingDeg);
+    setErrorMessage(null);
   };
 
   const handlePositionError = (err: GeolocationPositionError) => {
-    let msg = 'Konum hatası oluştu.';
-    if (err.code === 1) {
-      msg = 'Konum izni reddedildi! Lütfen Safari/Chrome site ayarlarından bu site için Konum iznini "İzin Ver" olarak açın.';
-    } else if (err.code === 2) {
-      msg = 'Cihaz GPS konumuna ulaşamadı. Telefon ayarlarından Konum Servislerinin açık olduğundan emin olun.';
-    } else if (err.code === 3) {
-      msg = 'Konum isteği zaman aşımına uğradı. Tekrar deneyin.';
+    // Sadece gerçekten izin reddedilmişse ve hiç konum alınamadıysa hata göster
+    if (err.code === 1 && !gpsData.lat) {
+      setErrorMessage('Konum izni verilmedi. Lütfen tarayıcı ayarlarından konuma izin verin.');
+      setStatus('İzin Hatası');
+      setIsTracking(false);
     }
-    setErrorMessage(msg);
-    setStatus('İzin / GPS Hatası');
-    setIsTracking(false);
   };
 
   const startTracking = () => {
     setErrorMessage(null);
 
     if (typeof window === 'undefined' || !('geolocation' in navigator)) {
-      alert('Tarayıcınızda veya cihazınızda Geolocation (GPS) desteği bulunmuyor.');
+      alert('Cihazınızda Geolocation desteği bulunmuyor.');
       return;
     }
 
-    setStatus('Konum İzni İsteniyor...');
+    setStatus('GPS Başlatıldı');
     setIsTracking(true);
 
-    // 1. İlk isteği doğrudan getCurrentPosition ile zorla tetikle (iOS Safari için şarttır)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        handlePositionSuccess(pos);
+    navigator.geolocation.getCurrentPosition(handlePositionSuccess, handlePositionError, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 1000,
+    });
 
-        // 2. Ardından sürekli takip için watchPosition başlat
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          handlePositionSuccess,
-          handlePositionError,
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0,
-          }
-        );
-      },
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      handlePositionSuccess,
       handlePositionError,
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+        timeout: 20000,
+        maximumAge: 1000,
       }
     );
   };
