@@ -12,31 +12,29 @@ interface ChatMessage {
     };
   };
   content: string;
-  created_at?: string;
 }
 
 export default function ChatOverlayWidget({ searchParams }: { searchParams: Record<string, any> }) {
-  const channel = searchParams?.channel || 'itsfatih';
+  const channel = (searchParams?.channel || 'itsfatih').trim().toLowerCase();
   const theme = searchParams?.theme || 'dark';
   const fontSize = searchParams?.font_size || '14';
   const showBadges = searchParams?.show_badges !== 'false';
-  const fadeTimeout = parseInt(searchParams?.fade_timeout || '0', 10);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Kick Emote Parser: [emote:12345:emoteName] -> <img src="https://files.kick.com/emotes/12345/fullsize" />
+  // Emote Parser: [emote:ID:name] ve standart Kick CDN desteği
   const renderMessageContent = (content: string) => {
-    if (!content) return null;
+    if (!content) return '';
 
     const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_-]+)\]/g;
     const parts: (string | React.ReactNode)[] = [];
-    let lastIndex = 0;
+    let lastIdx = 0;
     let match: RegExpExecArray | null;
 
     while ((match = emoteRegex.exec(content)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push(content.substring(lastIndex, match.index));
+      if (match.index > lastIdx) {
+        parts.push(content.substring(lastIdx, match.index));
       }
 
       const emoteId = match[1];
@@ -49,22 +47,21 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
           src={`https://files.kick.com/emotes/${emoteId}/fullsize`}
           alt={emoteName}
           title={emoteName}
-          className="inline-block align-middle mx-1 my-0.5 max-h-[1.5em] w-auto select-none object-contain"
+          className="inline-block align-middle mx-1 my-0.5 max-h-[1.4em] w-auto select-none object-contain"
           onError={(e) => {
-            // Yedek fallback URL
-            const target = e.currentTarget;
-            if (!target.src.includes('static-files.kick.com')) {
-              target.src = `https://static-files.kick.com/emotes/${emoteId}/fullsize`;
+            const el = e.currentTarget;
+            if (!el.src.includes('static-files.kick.com')) {
+              el.src = `https://static-files.kick.com/emotes/${emoteId}/fullsize`;
             }
           }}
         />
       );
 
-      lastIndex = match.index + match[0].length;
+      lastIdx = match.index + match[0].length;
     }
 
-    if (lastIndex < content.length) {
-      parts.push(content.substring(lastIndex));
+    if (lastIdx < content.length) {
+      parts.push(content.substring(lastIdx));
     }
 
     return parts.length > 0 ? parts : content;
@@ -72,25 +69,35 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
 
   useEffect(() => {
     let ws: WebSocket | null = null;
+    let pingInterval: NodeJS.Timeout | null = null;
     let isCancelled = false;
 
-    async function initPusher() {
+    async function connect() {
       try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`);
+        // Chatroom ID'yi API'den al
+        const res = await fetch(`/api/kick-chat?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         const data = await res.json();
-        const chatroomId = data?.chatroom?.id;
+        const chatroomId = data?.chatroom_id || data?.chatroom?.id;
 
         if (!chatroomId || isCancelled) return;
 
         ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f28308142977d07?protocol=7&client=js&version=7.6.0&flash=false');
 
         ws.onopen = () => {
+          // Kanala abone ol
           ws?.send(
             JSON.stringify({
               event: 'pusher:subscribe',
               data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
             })
           );
+
+          // Canlı tutmak için 30 saniyede bir ping gönder
+          pingInterval = setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
+            }
+          }, 30000);
         };
 
         ws.onmessage = (event) => {
@@ -98,26 +105,31 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
             const parsed = JSON.parse(event.data);
             if (parsed.event === 'App\\Events\\ChatMessageEvent') {
               const msgData = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
-
-              setMessages((prev) => {
-                const updated = [...prev, msgData];
-                return updated.slice(-40);
-              });
+              if (msgData?.content && msgData?.sender) {
+                setMessages((prev) => [...prev.slice(-40), msgData]);
+              }
             }
           } catch (e) {}
+        };
+
+        ws.onerror = () => {};
+        ws.onclose = () => {
+          if (!isCancelled) {
+            setTimeout(connect, 3000); // Kapanırsa 3 saniye sonra tekrar bağlan
+          }
         };
       } catch (err) {}
     }
 
-    initPusher();
+    connect();
 
     return () => {
       isCancelled = true;
+      if (pingInterval) clearInterval(pingInterval);
       if (ws) ws.close();
     };
   }, [channel]);
 
-  // Yeni mesaj geldikçe otomatik aşağı kaydır
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -144,11 +156,10 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
               key={msg.id || index}
               className={`flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl border backdrop-blur-md shadow-md animate-[fadeIn_0.2s_ease-out] ${
                 isLight
-                  ? 'bg-white/85 border-black/5 text-slate-900 shadow-slate-200/50'
-                  : 'bg-[#0b0e14]/85 border-white/10 text-white shadow-black/40'
+                  ? 'bg-white/90 border-black/5 text-slate-900 shadow-slate-200/50'
+                  : 'bg-[#0b0e14]/90 border-white/10 text-white shadow-black/40'
               }`}
             >
-              {/* Rozetler */}
               {showBadges && msg.sender?.identity?.badges && (
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {msg.sender.identity.badges.map((b, i) => (
@@ -162,15 +173,10 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
                 </div>
               )}
 
-              {/* Kullanıcı Adı */}
-              <span
-                className="font-black flex-shrink-0"
-                style={{ color: userColor }}
-              >
+              <span className="font-black flex-shrink-0" style={{ color: userColor }}>
                 {msg.sender?.username}:
               </span>
 
-              {/* Mesaj İçeriği + Emote Görselleri */}
               <span className="font-medium break-words leading-relaxed flex-1 min-w-0">
                 {renderMessageContent(msg.content)}
               </span>
