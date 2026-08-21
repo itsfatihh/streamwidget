@@ -206,9 +206,15 @@ export const WIDGETS_LIST: WidgetDef[] = [
   {
     id: "irl-hud",
     name: { en: "IRL Stream HUD", tr: "IRL Canlı Yayın HUD", es: "HUD de Transmisión IRL", de: "IRL-Stream-HUD", pt: "HUD de Transmissão IRL", fr: "HUD de Stream IRL", ru: "IRL Стрим HUD" },
-    description: { en: "Real-time Live badge, clock, IP geolocation, and weather status.", tr: "Canlı saat, IP tabanlı konum, hava durumu ve canlı yayın durumu.", es: "Reloj en tiempo real, geolocalización por IP y clima.", de: "Echtzeituhr, IP-Geolokalisierung und Wetter.", pt: "Relógio em tempo real, geolocalização e clima.", fr: "Horloge en direct, géolocalisation et météo.", ru: "Часы в реальном времени, геолокация и погода." },
+    description: { en: "Real-time Live badge, clock, IP geolocation, and weather status. Controlled via Kick chat commands.", tr: "Canlı saat, IP tabanlı konum ve hava durumu. Kick chat komutlarıyla anlık yönetilebilir.", es: "Reloj en tiempo real, geolocalización por IP y clima.", de: "Echtzeituhr, IP-Geolokalisierung und Wetter.", pt: "Relógio em tempo real, geolocalização e clima.", fr: "Horloge en direct, géolocalisation et météo.", ru: "Часы в реальном времени, геолокация и погода." },
     category: "IRL",
     fields: [
+      {
+        name: "channel",
+        label: { en: "Kick Channel Name", tr: "Kick Kanal Adı", es: "Nombre del canal de Kick", de: "Kick-Kanalname", pt: "Nome do Canal Kick", fr: "Nom de la chaîne Kick", ru: "Имя канала Kick" },
+        type: "text",
+        defaultValue: "itsfatih"
+      },
       {
         name: "showLive",
         label: { en: "LIVE Badge", tr: "LIVE Rozeti", es: "Insignia LIVE", de: "LIVE-Abzeichen", pt: "Distintivo LIVE", fr: "Badge LIVE", ru: "Значок LIVE" },
@@ -248,12 +254,6 @@ export const WIDGETS_LIST: WidgetDef[] = [
           { label: { en: "Show", tr: "Açık", es: "Mostrar", de: "Anzeigen", pt: "Mostrar", fr: "Afficher", ru: "Показать" }, value: "true" },
           { label: { en: "Hide", tr: "Kapalı", es: "Ocultar", de: "Ausblenden", pt: "Ocultar", fr: "Masquer", ru: "Скрыть" }, value: "false" }
         ]
-      },
-      {
-        name: "city",
-        label: { en: "Custom City (Optional)", tr: "Özel Şehir (Opsiyonel)", es: "Ciudad personalizada", de: "Eigene Stadt (Optional)", pt: "Cidade personalizada", fr: "Ville personnalisée", ru: "Свой город" },
-        type: "text",
-        defaultValue: ""
       },
       {
         name: "theme",
