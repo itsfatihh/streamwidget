@@ -25,7 +25,6 @@ export default function BuilderPage() {
   const [copied, setCopied] = useState(false);
   const [lang, setLang] = useState('tr');
 
-  // Varsayılan form değerlerini ve URL'den dönen Spotify token'ını doldur
   useEffect(() => {
     if (widget) {
       const initial: Record<string, string> = {};
@@ -33,7 +32,6 @@ export default function BuilderPage() {
         initial[f.name] = f.defaultValue;
       });
 
-      // Spotify callback'ten gelen refresh_token varsa otomatik ekle
       const urlRefreshToken = searchParams.get('refresh_token');
       if (urlRefreshToken && slug === 'now-playing') {
         initial['refresh_token'] = urlRefreshToken;
@@ -58,7 +56,6 @@ export default function BuilderPage() {
     setFormValues((prev) => ({ ...prev, [name]: value }));
   };
 
-  // OBS Tarayıcı Kaynağı URL'si
   const queryParams = new URLSearchParams(formValues).toString();
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.streamwidget.live';
   const obsUrl = `${baseUrl}/w/${slug}?${queryParams}`;
@@ -68,6 +65,8 @@ export default function BuilderPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const isSpotifyConnected = !!(formValues['refresh_token'] || searchParams.get('spotify_connected'));
 
   return (
     <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-emerald-500 selection:text-black">
@@ -113,31 +112,46 @@ export default function BuilderPage() {
           {/* Spotify Giriş Butonu */}
           {slug === 'now-playing' && (
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-col gap-2.5">
-              <span className="text-xs font-bold text-emerald-400">Spotify Hesabını Eşle</span>
-              <p className="text-[11px] text-white/60 leading-normal">
-                O an çalan şarkıyı canlı yakalamak için Spotify hesabınızla bir defa yetkilendirme yapın.
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-400">Yöntem 1: Tek Tıkla Bağlan (Önerilen)</span>
+                {isSpotifyConnected && (
+                  <span className="text-[10px] font-mono font-black text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/40">
+                    BAĞLANDI ✓
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-white/70 leading-normal">
+                Aşağıdaki butona tıklayıp onay vermeniz yeterlidir. Token kutusunu elle doldurmanıza gerek kalmaz, sistem linkinizi otomatik oluşturur.
               </p>
               <a
                 href={`/api/auth/spotify?channel=${encodeURIComponent(formValues['channel'] || 'itsfatih')}`}
                 className="w-full py-2.5 px-4 bg-[#1DB954] hover:bg-[#1ed760] text-black font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all"
               >
-                <span>🟢</span> Spotify ile Bağlan
+                <span>🟢</span> {isSpotifyConnected ? 'Spotify Hesabını Yeniden Bağla' : 'Spotify ile Bağlan'}
               </a>
-              {searchParams.get('spotify_connected') && (
-                <span className="text-[11px] text-emerald-400 font-mono font-semibold text-center mt-1">
-                  ✓ Spotify bağlantısı başarıyla sağlandı!
-                </span>
-              )}
             </div>
           )}
 
           {/* Form Alanları */}
           <div className="flex flex-col gap-4">
+            {slug === 'now-playing' && (
+              <div className="flex items-center gap-2 my-1">
+                <div className="h-[1px] bg-white/10 flex-1" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-white/40">veya manuel ayarlar</span>
+                <div className="h-[1px] bg-white/10 flex-1" />
+              </div>
+            )}
+
             {widget.fields.map((field) => (
               <div key={field.name} className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-white/70">
-                  {field.label[lang] || field.label['tr']}
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-white/70">
+                    {field.label[lang] || field.label['tr']}
+                  </label>
+                  {field.name === 'refresh_token' && (
+                    <span className="text-[10px] text-white/40 font-mono">Otomatik doldurulur</span>
+                  )}
+                </div>
 
                 {field.type === 'select' ? (
                   <select
@@ -169,6 +183,7 @@ export default function BuilderPage() {
                 ) : (
                   <input
                     type="text"
+                    placeholder={field.name === 'refresh_token' ? 'Spotify ile bağlandığınızda buraya otomatik gelir' : ''}
                     value={formValues[field.name] !== undefined ? formValues[field.name] : field.defaultValue}
                     onChange={(e) => handleChange(field.name, e.target.value)}
                     className="w-full bg-black/50 border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white font-medium focus:outline-none focus:border-emerald-500/50 transition-colors"
@@ -204,8 +219,8 @@ export default function BuilderPage() {
           </div>
         </div>
 
-        {/* Sağ Panel: Canlı Önizleme */}
-        <div className="lg:col-span-7 flex flex-col gap-3">
+        {/* Sağ Panel: Canlı Önizleme & Açıklama */}
+        <div className="lg:col-span-7 flex flex-col gap-4">
           <div className="flex items-center justify-between px-2">
             <span className="text-[11px] font-mono font-black uppercase tracking-widest text-white/40">
               CANLI ÖNİZLEME
@@ -224,6 +239,29 @@ export default function BuilderPage() {
             {slug === 'now-playing' && <NowPlayingWidget searchParams={formValues} />}
             {slug === 'qr-tip' && <QrTipWidget searchParams={formValues} />}
           </div>
+
+          {/* Token Rehberi (Sadece Now Playing için) */}
+          {slug === 'now-playing' && (
+            <div className="bg-[#0b0e14]/90 border border-white/10 rounded-3xl p-6 shadow-xl flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">💡</span>
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  Spotify Bağlantısı ve Token Hakkında Bilgi
+                </span>
+              </div>
+              <ul className="text-xs text-white/70 space-y-2 leading-relaxed list-disc list-inside">
+                <li>
+                  <strong className="text-white">İkisini de yapmanız gerekmez:</strong> Sol taraftaki yeşil <span className="text-emerald-400 font-semibold">"Spotify ile Bağlan"</span> butonuna bastığınızda oturum anahtarınız otomatik alınır ve linkinize eklenir.
+                </li>
+                <li>
+                  <strong className="text-white">Token Nerede?:</strong> Başarılı girişten sonra oluşan özel oturum anahtarı formdaki <span className="text-emerald-400 font-mono">refresh_token</span> alanına otomatik işlenir.
+                </li>
+                <li>
+                  <strong className="text-white">Manuel Kullanım:</strong> Başka bir araçtan veya Spotify Developer panelinden aldığınız kendi Refresh Token kodunuz varsa, butona basmadan doğrudan formdaki kutuya yapıştırıp OBS linkinizi oluşturabilirsiniz.
+                </li>
+              </ul>
+            </div>
+          )}
         </div>
 
       </main>
