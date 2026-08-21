@@ -10,6 +10,7 @@ function GpsTrackerContent() {
   const [session, setSession] = useState(initialSession);
   const [isTracking, setIsTracking] = useState(false);
   const [status, setStatus] = useState<string>('Hazır');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [gpsData, setGpsData] = useState<{
     lat: number;
     lng: number;
@@ -33,7 +34,7 @@ function GpsTrackerContent() {
     }
   }, [isTracking]);
 
-  const sendLocation = async (lat: number, lng: number, speed: number, heading: number) => {
+  const sendLocation = (lat: number, lng: number, speed: number, heading: number) => {
     const payload = JSON.stringify({
       channel: session.toLowerCase().trim(),
       lat,
@@ -44,13 +45,11 @@ function GpsTrackerContent() {
     });
 
     try {
-      // 1. Anlık PubSub Rölesi
       fetch(`https://ntfy.sh/sw_gps_${session.toLowerCase().trim()}`, {
         method: 'POST',
         body: payload,
       }).catch(() => {});
 
-      // 2. Yedek API
       fetch('/api/gps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -59,33 +58,70 @@ function GpsTrackerContent() {
 
       setLastSent(new Date().toLocaleTimeString('tr-TR'));
       setStatus('Canlı Gönderiliyor 🚀');
+      setErrorMessage(null);
     } catch (e) {
       setStatus('Gönderim Hatası');
     }
   };
 
+  const handlePositionSuccess = (pos: GeolocationPosition) => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const speedKmh = pos.coords.speed !== null && pos.coords.speed >= 0 ? Math.round(pos.coords.speed * 3.6) : 0;
+    const headingDeg = pos.coords.heading !== null && !isNaN(pos.coords.heading) ? Math.round(pos.coords.heading) : 0;
+    const accuracy = Math.round(pos.coords.accuracy || 0);
+
+    setGpsData({ lat, lng, speed: speedKmh, heading: headingDeg, accuracy });
+    sendLocation(lat, lng, speedKmh, headingDeg);
+  };
+
+  const handlePositionError = (err: GeolocationPositionError) => {
+    let msg = 'Konum hatası oluştu.';
+    if (err.code === 1) {
+      msg = 'Konum izni reddedildi! Lütfen Safari/Chrome site ayarlarından bu site için Konum iznini "İzin Ver" olarak açın.';
+    } else if (err.code === 2) {
+      msg = 'Cihaz GPS konumuna ulaşamadı. Telefon ayarlarından Konum Servislerinin açık olduğundan emin olun.';
+    } else if (err.code === 3) {
+      msg = 'Konum isteği zaman aşımına uğradı. Tekrar deneyin.';
+    }
+    setErrorMessage(msg);
+    setStatus('İzin / GPS Hatası');
+    setIsTracking(false);
+  };
+
   const startTracking = () => {
-    if (!navigator.geolocation) {
-      alert('GPS desteği bulunamadı.');
+    setErrorMessage(null);
+
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
+      alert('Tarayıcınızda veya cihazınızda Geolocation (GPS) desteği bulunmuyor.');
       return;
     }
 
-    setStatus('GPS Aranıyor...');
+    setStatus('Konum İzni İsteniyor...');
     setIsTracking(true);
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
+    // 1. İlk isteği doğrudan getCurrentPosition ile zorla tetikle (iOS Safari için şarttır)
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        const speedKmh = pos.coords.speed !== null && pos.coords.speed >= 0 ? Math.round(pos.coords.speed * 3.6) : 0;
-        const headingDeg = pos.coords.heading !== null && !isNaN(pos.coords.heading) ? Math.round(pos.coords.heading) : 0;
-        const accuracy = Math.round(pos.coords.accuracy || 0);
+        handlePositionSuccess(pos);
 
-        setGpsData({ lat, lng, speed: speedKmh, heading: headingDeg, accuracy });
-        sendLocation(lat, lng, speedKmh, headingDeg);
+        // 2. Ardından sürekli takip için watchPosition başlat
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          handlePositionSuccess,
+          handlePositionError,
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0,
+          }
+        );
       },
-      (err) => setStatus(`GPS Hatası: ${err.message}`),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      handlePositionError,
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
     );
   };
 
@@ -111,7 +147,13 @@ function GpsTrackerContent() {
         </div>
       </header>
 
-      <main className="w-full max-w-md my-auto space-y-6">
+      <main className="w-full max-w-md my-auto space-y-5">
+        {errorMessage && (
+          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-medium leading-relaxed">
+            ⚠️ {errorMessage}
+          </div>
+        )}
+
         <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 space-y-3">
           <label className="text-xs font-bold text-white/60 uppercase tracking-wider block">Oturum / Kanal Adı</label>
           <input
@@ -143,7 +185,7 @@ function GpsTrackerContent() {
             <span className="font-bold text-emerald-400">{status}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-white/40">Enlem / Boylam:</span>
+            <span className="text-white/40">Koordinat:</span>
             <span className="text-white/80">{gpsData.lat ? `${gpsData.lat.toFixed(5)}, ${gpsData.lng.toFixed(5)}` : '--'}</span>
           </div>
           <div className="flex justify-between">
