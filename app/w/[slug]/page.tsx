@@ -13,7 +13,7 @@ import { WIDGETS_LIST } from "@/lib/widgets";
 
 
 
-import { use, useEffect, useState, Suspense, useCallback } from 'react';
+import { use, useEffect, useState, Suspense, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Pusher from 'pusher-js';
 
@@ -664,20 +664,26 @@ export default function DynamicWidgetPage({ params }: { params: Promise<{ slug: 
 
 
 
+
+
+
 function MiniMapWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const channel = searchParams.channel || 'itsfatih';
   const shape = searchParams.shape || 'circle';
   const accent = searchParams.accent || '#53FC18';
   const showSpeed = searchParams.showSpeed !== 'false';
 
-  const [pos, setPos] = useState<{ lat: number; lng: number; speed: number; heading: number | null }>({
-    lat: 49.4875, // Varsayılan konum
+  const [pos, setPos] = useState<{ lat: number; lng: number; speed: number; heading: number }>({
+    lat: 49.4875,
     lng: 8.4660,
     speed: 0,
     heading: 0,
   });
   const [status, setStatus] = useState<'connecting' | 'live'>('connecting');
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
 
+  // GPS Yoklama
   useEffect(() => {
     const fetchGPS = async () => {
       try {
@@ -686,80 +692,137 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
           const data = await res.json();
           if (data && data.lat) {
             setPos({
-              lat: data.lat,
-              lng: data.lng,
-              speed: Math.round(data.speed || 0),
-              heading: data.heading || 0,
+              lat: Number(data.lat),
+              lng: Number(data.lng),
+              speed: Math.round(Number(data.speed || 0)),
+              heading: Number(data.heading || 0),
             });
             setStatus('live');
           }
         }
-      } catch (e) {
-        // sessizce devam et
-      }
+      } catch (e) {}
     };
 
     fetchGPS();
-    const interval = setInterval(fetchGPS, 1500);
+    const interval = setInterval(fetchGPS, 1000);
     return () => clearInterval(interval);
   }, [channel]);
 
-  // OpenStreetMap / Carto Dark Tiles hesaplaması
-  const zoom = 16;
-  const n = Math.pow(2, zoom);
-  const latRad = (pos.lat * Math.PI) / 180;
-  const xtile = Math.floor(((pos.lng + 180) / 360) * n);
-  const ytile = Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n);
+  // Leaflet Harita Başlatma (CDN üzerinden güvenli yükleme)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !mapContainerRef.current) return;
+
+    const loadLeaflet = () => {
+      if ((window as any).L) {
+        initMap();
+        return;
+      }
+
+      if (!document.getElementById('leaflet-css')) {
+        const link = document.createElement('link');
+        link.id = 'leaflet-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+      }
+
+      if (!document.getElementById('leaflet-js')) {
+        const script = document.createElement('script');
+        script.id = 'leaflet-js';
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = () => initMap();
+        document.head.appendChild(script);
+      }
+    };
+
+    const initMap = () => {
+      const L = (window as any).L;
+      if (!L || !mapContainerRef.current || mapInstanceRef.current) return;
+
+      const map = L.map(mapContainerRef.current, {
+        center: [pos.lat, pos.lng],
+        zoom: 16,
+        zoomControl: false,
+        attributionControl: false,
+        dragging: false,
+        touchZoom: false,
+        doubleClickZoom: false,
+        scrollWheelZoom: false,
+        boxZoom: false,
+        keyboard: false,
+      });
+
+      // CartoDB Dark Matter karo katmanı
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+      }).addTo(map);
+
+      mapInstanceRef.current = map;
+    };
+
+    loadLeaflet();
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, []);
+
+  // Harita Merkezini ve Yönünü Güncelle
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.setView([pos.lat, pos.lng], 16, { animate: true, pan: { duration: 0.8 } });
+    }
+  }, [pos.lat, pos.lng]);
 
   return (
-    <div className="w-screen h-screen flex items-center justify-center bg-transparent p-4">
+    <div className="w-screen h-screen flex items-center justify-center bg-transparent p-4 select-none">
       <div
-        className={`relative overflow-hidden border-2 shadow-2xl transition-all duration-300 ${
-          shape === 'circle' ? 'w-64 h-64 rounded-full' : 'w-64 h-64 rounded-3xl'
+        className={`relative overflow-hidden border-[3px] shadow-[0_0_40px_rgba(0,0,0,0.8)] ${
+          shape === 'circle' ? 'w-72 h-72 rounded-full' : 'w-72 h-72 rounded-3xl'
         }`}
         style={{
           borderColor: accent,
-          backgroundColor: '#0a0d14',
-          boxShadow: `0 0 25px ${accent}33`,
+          backgroundColor: '#090b10',
+          boxShadow: `0 0 30px ${accent}40`,
         }}
       >
-        {/* Harita Katmanı (CartoDB Dark Matter) */}
-        <div
-          className="absolute inset-0 bg-cover bg-center transition-all duration-700"
-          style={{
-            backgroundImage: `url('https://a.basemaps.cartocdn.com/dark_all/${zoom}/${xtile}/${ytile}.png')`,
-            filter: 'brightness(0.9) contrast(1.1)',
-            transform: `scale(1.8) rotate(-${pos.heading || 0}deg)`,
-          }}
-        />
+        {/* Canlı Leaflet Harita */}
+        <div ref={mapContainerRef} className="w-full h-full transform scale-110 pointer-events-none" />
 
-        {/* Radar Izgarası & Efekti */}
-        <div className="absolute inset-0 bg-[radial-gradient(#ffffff10_1px,transparent_1px)] [background-size:16px_16px]" />
-        <div className="absolute inset-0 rounded-full border border-dashed border-white/15 pointer-events-none" />
+        {/* NFS / Radar Izgara Katmanı */}
+        <div className="absolute inset-0 bg-[radial-gradient(#ffffff15_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+        <div className="absolute inset-0 rounded-full border border-dashed border-white/20 pointer-events-none" />
 
-        {/* Merkez Ok (Yön & Oyuncu İkonu) */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative flex flex-col items-center">
+        {/* Merkez Oyuncu Oku (Yön Açısı) */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div
+            className="relative flex flex-col items-center transition-transform duration-500 ease-out"
+            style={{ transform: `rotate(${pos.heading || 0}deg)` }}
+          >
             <div
-              className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[18px] drop-shadow-[0_0_8px_currentColor]"
+              className="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-b-[20px] drop-shadow-[0_0_10px_currentColor]"
               style={{ borderBottomColor: accent, color: accent }}
             />
-            <div className="w-2.5 h-2.5 rounded-full bg-white -mt-1 shadow-md border border-black" />
+            <div className="w-3 h-3 rounded-full bg-white -mt-1 shadow-md border-2 border-black" />
           </div>
         </div>
 
-        {/* Canlı GPS / Hız Rozeti */}
+        {/* Hız Göstergesi */}
         {showSpeed && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/85 backdrop-blur-md px-3 py-1 rounded-xl border border-white/15 flex items-baseline gap-1 shadow-lg">
-            <span className="text-base font-black font-mono text-white tracking-wider">{pos.speed}</span>
-            <span className="text-[9px] font-bold text-white/50">KM/H</span>
+          <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md px-3.5 py-1 rounded-xl border border-white/20 flex items-baseline gap-1.5 shadow-2xl pointer-events-none">
+            <span className="text-lg font-black font-mono text-white tracking-wider">{pos.speed}</span>
+            <span className="text-[9px] font-black text-white/50 tracking-widest uppercase">KM/H</span>
           </div>
         )}
 
-        {/* Durum Rozeti */}
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-black/75 backdrop-blur-sm px-2 py-0.5 rounded-full border border-white/10 flex items-center gap-1.5">
-          <div className={`w-1.5 h-1.5 rounded-full ${status === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-          <span className="text-[9px] font-black tracking-widest text-white/80 uppercase">
+        {/* GPS Durum Rozeti */}
+        <div className="absolute top-3.5 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/15 flex items-center gap-1.5 shadow-lg pointer-events-none">
+          <div className={`w-1.5 h-1.5 rounded-full ${status === 'live' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
+          <span className="text-[9px] font-black tracking-widest text-white/90 uppercase">
             {status === 'live' ? 'GPS LIVE' : 'SYNCING'}
           </span>
         </div>
