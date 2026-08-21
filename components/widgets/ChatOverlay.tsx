@@ -53,6 +53,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
         const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         const data = await res.json();
         const chatroomId = data?.chatroom?.id || data?.chatroom_id;
+        const pusherKey = data?.pusher_key || 'eb1d5f28308142977d07';
 
         if (!chatroomId) {
           if (!isCancelled) setStatusText(`Kanal gizli veya bulunamadı (${channel})`);
@@ -60,9 +61,10 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
         }
 
         if (isCancelled) return;
-        setStatusText(`Bağlanılıyor... (Oda ID: ${chatroomId})`);
+        setStatusText(`Bağlanılıyor... (Anahtar: ${pusherKey.slice(0, 5)}...)`);
 
-        ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f28308142977d07?protocol=7&client=js&version=7.6.0&flash=false');
+        // Dinamik Pusher Key ile bağlantı
+        ws = new WebSocket(`wss://ws-us2.pusher.com/app/${pusherKey}?protocol=7&client=js&version=7.6.0&flash=false`);
 
         ws.onopen = () => {
           setStatusText(`Soket açıldı, Pusher bekleniyor...`);
