@@ -18,10 +18,14 @@ export async function GET(req: NextRequest) {
     if (res.ok) {
       const data = await res.json();
       const subBadges: Record<number, string> = {};
+      
+      // Kanalın yüklediği abone rozetleri haritası
       if (Array.isArray(data.subscriber_badges)) {
         data.subscriber_badges.forEach((b: any) => {
-          if (b.months !== undefined && b.badge_image?.url) {
-            subBadges[b.months] = b.badge_image.url;
+          const months = b.months;
+          const url = b.badge_image?.url || b.badge_image?.src || (b.badge_image?.id ? "https://files.kick.com/subscriber_badges/" + b.badge_image.id + "/fullsize" : null);
+          if (months !== undefined && url) {
+            subBadges[months] = url;
           }
         });
       }
@@ -30,20 +34,6 @@ export async function GET(req: NextRequest) {
         success: true,
         chatroom_id: data.chatroom?.id || data.id,
         subscriber_badges: subBadges,
-      });
-    }
-
-    const v1Res = await fetch("https://kick.com/api/v1/channels/" + encodeURIComponent(channel), {
-      headers,
-      cache: "no-store",
-    });
-
-    if (v1Res.ok) {
-      const dataV1 = await v1Res.json();
-      return NextResponse.json({
-        success: true,
-        chatroom_id: dataV1.chatroom?.id || dataV1.chatroom_id,
-        subscriber_badges: {},
       });
     }
 

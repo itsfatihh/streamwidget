@@ -20,6 +20,7 @@ interface ChatMessage {
 const CHANNEL_CHATROOM_MAP: Record<string, string> = {
   itsfatih: '1917711',
   batuhankaradeniz: '2437618',
+  cavs: '2437618',
   elraenn: '2437618',
   kendinemuzisyen: '2437618',
 };
@@ -31,7 +32,6 @@ const KICK_GLOBAL_BADGES: Record<string, string> = {
   og: 'https://kick.com/images/badges/og.svg',
   founder: 'https://kick.com/images/badges/founder.svg',
   verified: 'https://kick.com/images/badges/verified.svg',
-  sub_default: 'https://kick.com/images/badges/subscriber.svg',
 };
 
 export default function KickChatWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
@@ -49,23 +49,20 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     let pingInterval: any = null;
     let isCancelled = false;
 
+    // Kanal rozetlerini arka planda çek (Soket bağlantısını bekletmez veya bozmaz)
+    fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isCancelled && data?.subscriber_badges) {
+          setSubBadgeMap(data.subscriber_badges);
+        }
+      })
+      .catch(() => {});
+
     const startChat = async () => {
       let chatroomId = CHANNEL_CHATROOM_MAP[channel] || '1917711';
 
-      try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.chatroom_id) {
-            chatroomId = String(data.chatroom_id);
-          }
-          if (data && data.subscriber_badges) {
-            setSubBadgeMap(data.subscriber_badges);
-          }
-        }
-      } catch (e) {}
-
-      if (channel === 'batuhankaradeniz') chatroomId = '2437618';
+      if (channel === 'batuhankaradeniz' || channel === 'cavs') chatroomId = '2437618';
       if (channel === 'itsfatih') chatroomId = '1917711';
 
       if (isCancelled) return;
@@ -139,16 +136,20 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     }
   }, [messages]);
 
+  // Kanala Özel Orijinal Rozet Render Fonksiyonu
   const renderBadge = (badge: ChatBadge, idx: number): React.ReactNode => {
     const type = badge.type?.toLowerCase() || '';
 
+    // 1. Kanala Özgü Abone Rozeti (Kanalın /subscribe sayfasındaki yüklediği görseller)
     if (type === 'subscriber' || type === 'sub') {
       const months = badge.count ?? 1;
+      
+      // Kanalın o ay kademesi için özel rozetini bul (Örn: 2 aylık abone -> 2 ay rozeti)
       let customUrl = subBadgeMap[months];
       if (!customUrl) {
-        const availableMonths = Object.keys(subBadgeMap).map(Number).sort((a, b) => b - a);
-        const matchMonth = availableMonths.find((m) => months >= m);
-        if (matchMonth) customUrl = subBadgeMap[matchMonth];
+        const sorted = Object.keys(subBadgeMap).map(Number).sort((a, b) => b - a);
+        const match = sorted.find((m) => months >= m);
+        if (match) customUrl = subBadgeMap[match];
       }
 
       if (customUrl) {
@@ -158,22 +159,24 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
             src={customUrl}
             alt={`Sub ${months}m`}
             title={`Abone: ${months} Ay`}
-            className="inline-block h-4 w-auto align-middle object-contain mx-0.5 rounded-[2px]"
+            className="inline-block h-4 w-4 object-contain align-middle rounded-[2px]"
           />
         );
       }
 
+      // Kanal henüz özel rozet yüklememişse varsayılan rozet kutusu
       return (
         <span
           key={idx}
           title={`Abone: ${months} Ay`}
-          className="inline-flex items-center justify-center gap-0.5 bg-black border border-[#53FC18] text-[#53FC18] font-black text-[10px] px-1 py-[1px] rounded-[4px] leading-none"
+          className="inline-flex items-center justify-center bg-black border border-[#53FC18] text-[#53FC18] font-bold text-[9px] px-1 py-[0.5px] rounded-[3px] leading-none"
         >
           ★ {months}
         </span>
       );
     }
 
+    // 2. Global Kick Rozetleri (VIP, MOD, HOST, OG)
     const globalUrl = KICK_GLOBAL_BADGES[type];
     if (globalUrl) {
       return (
@@ -182,7 +185,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
           src={globalUrl}
           alt={type}
           title={type.toUpperCase()}
-          className="inline-block h-4 w-auto align-middle object-contain mx-0.5"
+          className="inline-block h-4 w-4 object-contain align-middle"
           onError={(e) => {
             (e.target as HTMLElement).style.display = 'none';
           }}
@@ -239,11 +242,12 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       : {};
 
   const renderCard = (msg: ChatMessage) => {
+    // 1. Minimal Tema
     if (theme === 'minimal') {
       return (
         <div key={msg.id} className={`animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-center flex-wrap gap-x-1.5 ${sizeStyles}`} style={strokeStyle}>
           {msg.badges.length > 0 && (
-            <span className="inline-flex items-center gap-0.5">
+            <span className="inline-flex items-center gap-1">
               {msg.badges.map((b, i) => renderBadge(b, i))}
             </span>
           )}
@@ -257,6 +261,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       );
     }
 
+    // 2. Çerçeveli Tema
     return (
       <div
         key={msg.id}
@@ -269,7 +274,7 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       >
         <div className="flex items-center gap-1.5">
           {msg.badges.length > 0 && (
-            <span className="inline-flex items-center gap-0.5">
+            <span className="inline-flex items-center gap-1">
               {msg.badges.map((b, i) => renderBadge(b, i))}
             </span>
           )}
