@@ -12,7 +12,7 @@ function normalizeSlug(raw: string) {
   return clean;
 }
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from 'react';
 import { WIDGETS_LIST } from "@/lib/widgets";
 import { TRANSLATIONS, LangCode } from "@/lib/i18n";
 import LanguageSelector from "@/components/LanguageSelector";
@@ -57,6 +57,71 @@ export default function BuilderPage({ params }: { params: Promise<{ slug: string
       if (f.defaultValue !== undefined) initialForm[f.name] = String(f.defaultValue);
     });
   }
+
+  
+  const [gpsActive, setGpsActive] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState<string>('Hazır');
+  const [livePos, setLivePos] = useState<{ lat: number; lng: number; speed: number; heading: number }>({
+    lat: 43.5221,
+    lng: 3.9191,
+    speed: 0,
+    heading: 0,
+  });
+  const gpsWatchRef = useRef<number | null>(null);
+
+  const broadcastLocation = (lat: number, lng: number, speed: number, heading: number) => {
+    const ch = (formState.channel || 'itsfatih').toLowerCase().trim();
+    const payload = JSON.stringify({ channel: ch, lat, lng, speed, heading, time: Date.now() });
+
+    fetch(`https://ntfy.sh/sw_gps_${ch}`, { method: 'POST', body: payload }).catch(() => {});
+    fetch('/api/gps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    }).catch(() => {});
+  };
+
+  const toggleBuilderGPS = () => {
+    if (gpsActive) {
+      if (gpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current);
+        gpsWatchRef.current = null;
+      }
+      setGpsActive(false);
+      setGpsStatus('Durduruldu');
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      alert('Tarayıcınızda GPS desteği bulunamadı.');
+      return;
+    }
+
+    setGpsStatus('Konum Alınıyor...');
+    setGpsActive(true);
+
+    const onPos = (pos: GeolocationPosition) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const speed = pos.coords.speed !== null && pos.coords.speed >= 0 ? Math.round(pos.coords.speed * 3.6) : 0;
+      const heading = pos.coords.heading !== null && !isNaN(pos.coords.heading) ? Math.round(pos.coords.heading) : 0;
+
+      setLivePos({ lat, lng, speed, heading });
+      setGpsStatus('Canlı Yayında 🚀');
+      broadcastLocation(lat, lng, speed, heading);
+    };
+
+    const onErr = (err: GeolocationPositionError) => {
+      setGpsStatus('İzin / GPS Hatası');
+      setGpsActive(false);
+    };
+
+    navigator.geolocation.getCurrentPosition(onPos, onErr, { enableHighAccuracy: true, timeout: 15000 });
+    gpsWatchRef.current = navigator.geolocation.watchPosition(onPos, onErr, {
+      enableHighAccuracy: true,
+      timeout: 20000,
+    });
+  };
 
   const [formState, setFormState] = useState<Record<string, string>>(initialForm);
   const [copied, setCopied] = useState(false);
