@@ -238,8 +238,6 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     color?: string;
   } | null>(null);
 
-  const lastPinnedId = useRef<string | null>(null);
-
   const playPingSound = () => {
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -258,45 +256,89 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
   };
 
   useEffect(() => {
-    let timer: any = null;
+    let ws: WebSocket | null = null;
+    let keepAlive: any = null;
 
-    const fetchPinned = async () => {
+    const chatroomId = "1917711"; // itsfatih chatroom ID
+
+    ws = new WebSocket("wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false");
+
+    ws.onopen = () => {
+      ws?.send(JSON.stringify({
+        event: "pusher:subscribe",
+        data: { auth: "", channel: "chatrooms." + chatroomId + ".v2" }
+      }));
+    };
+
+    ws.onmessage = (event) => {
       try {
-        const res = await fetch("/api/kick/pinned?channel=" + encodeURIComponent(channel), { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
+        const parsed = JSON.parse(event.data);
+        const ev = parsed.event || "";
 
-        if (data.pinned) {
-          const pm = data.pinned;
-          const pId = String(pm.id || pm.message?.id || Date.now());
-          const sender = pm.sender?.username || pm.user?.username || pm.message?.sender?.username || channel;
-          const text = pm.content || pm.message?.content || pm.message || "";
-          const color = pm.sender?.identity?.color || pm.message?.sender?.identity?.color || accent;
-
-          if (lastPinnedId.current !== pId) {
-            lastPinnedId.current = pId;
-            setPinned({
-              id: pId,
-              username: sender,
-              content: text,
-              color: color,
-            });
-            playPingSound();
-          }
-        } else {
-          if (lastPinnedId.current !== null) {
-            lastPinnedId.current = null;
+        // 1. Kick Resmi Sabitleme Olayları
+        if (ev.toLowerCase().includes("pin")) {
+          if (ev.toLowerCase().includes("unpin") || ev.toLowerCase().includes("delet")) {
             setPinned(null);
+            return;
+          }
+          let payload = parsed.data;
+          if (typeof payload === "string") {
+            try { payload = JSON.parse(payload); } catch(e) {}
+          }
+          const msg = payload.pinned_message || payload.message || payload;
+          const user = msg.sender?.username || msg.user?.username || "Moderatör";
+          const text = msg.content || msg.message?.content || msg.message || "";
+          const color = msg.sender?.identity?.color || accent;
+
+          if (text) {
+            setPinned({ id: String(Date.now()), username: user, content: text, color });
+            playPingSound();
+            return;
+          }
+        }
+
+        // 2. Canlı Chat Akışı Üzerinden Yakalama
+        if (ev.includes("ChatMessageEvent")) {
+          let msgData = parsed.data;
+          if (typeof msgData === "string") {
+            try { msgData = JSON.parse(msgData); } catch(e) {}
+          }
+          const text = (msgData.content || "").trim();
+          const sender = msgData.sender?.username || channel;
+          const color = msgData.sender?.identity?.color || accent;
+
+          // Sabitlemeyi kaldır: !unpin veya !pinkaldir
+          if (text.toLowerCase() === "!unpin" || text.toLowerCase() === "!pinkaldir") {
+            setPinned(null);
+            return;
+          }
+
+          // Sabitle: !pin <mesaj>
+          if (text.toLowerCase().startsWith("!pin ")) {
+            const cleanText = text.substring(5).trim();
+            if (cleanText) {
+              setPinned({
+                id: String(Date.now()),
+                username: sender,
+                content: cleanText,
+                color: color,
+              });
+              playPingSound();
+            }
           }
         }
       } catch (err) {}
     };
 
-    fetchPinned();
-    timer = setInterval(fetchPinned, 2000);
+    keepAlive = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: "pusher:ping", data: {} }));
+      }
+    }, 20000);
 
     return () => {
-      if (timer) clearInterval(timer);
+      if (ws) ws.close();
+      if (keepAlive) clearInterval(keepAlive);
     };
   }, [channel]);
 
