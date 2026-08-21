@@ -10,14 +10,7 @@ function GpsTrackerContent() {
   const [session, setSession] = useState(initialSession);
   const [isTracking, setIsTracking] = useState(false);
   const [status, setStatus] = useState<string>('Hazır');
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [gpsData, setGpsData] = useState<{
-    lat: number;
-    lng: number;
-    speed: number;
-    heading: number;
-    accuracy: number;
-  }>({
+  const [gpsData, setGpsData] = useState<{ lat: number; lng: number; speed: number; heading: number; accuracy: number }>({
     lat: 0,
     lng: 0,
     speed: 0,
@@ -34,33 +27,14 @@ function GpsTrackerContent() {
   }, [isTracking]);
 
   const sendLocation = (lat: number, lng: number, speed: number, heading: number) => {
-    const payload = JSON.stringify({
-      channel: session.toLowerCase().trim(),
-      lat,
-      lng,
-      speed,
-      heading,
-      time: Date.now(),
-    });
+    const sName = session.toLowerCase().trim();
+    const payload = JSON.stringify({ channel: sName, session: sName, lat, lng, speed, heading, time: Date.now() });
 
-    try {
-      fetch(`https://ntfy.sh/sw_gps_${session.toLowerCase().trim()}`, {
-        method: 'POST',
-        body: payload,
-      }).catch(() => {});
+    fetch(`https://ntfy.sh/sw_gps_${sName}`, { method: 'POST', body: payload }).catch(() => {});
+    fetch('/api/gps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload }).catch(() => {});
 
-      fetch('/api/gps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      }).catch(() => {});
-
-      setLastSent(new Date().toLocaleTimeString('tr-TR'));
-      setStatus('Canlı Gönderiliyor 🚀');
-      setErrorMessage(null);
-    } catch (e) {
-      setStatus('Gönderim Hatası');
-    }
+    setLastSent(new Date().toLocaleTimeString('tr-TR'));
+    setStatus('Canlı Gönderiliyor 🚀');
   };
 
   const handlePositionSuccess = (pos: GeolocationPosition) => {
@@ -72,44 +46,23 @@ function GpsTrackerContent() {
 
     setGpsData({ lat, lng, speed: speedKmh, heading: headingDeg, accuracy });
     sendLocation(lat, lng, speedKmh, headingDeg);
-    setErrorMessage(null);
-  };
-
-  const handlePositionError = (err: GeolocationPositionError) => {
-    // Sadece gerçekten izin reddedilmişse ve hiç konum alınamadıysa hata göster
-    if (err.code === 1 && !gpsData.lat) {
-      setErrorMessage('Konum izni verilmedi. Lütfen tarayıcı ayarlarından konuma izin verin.');
-      setStatus('İzin Hatası');
-      setIsTracking(false);
-    }
   };
 
   const startTracking = () => {
-    setErrorMessage(null);
-
-    if (typeof window === 'undefined' || !('geolocation' in navigator)) {
-      alert('Cihazınızda Geolocation desteği bulunmuyor.');
+    if (!navigator.geolocation) {
+      alert('Cihazınızda GPS desteği bulunamadı.');
       return;
     }
 
     setStatus('GPS Başlatıldı');
     setIsTracking(true);
 
-    navigator.geolocation.getCurrentPosition(handlePositionSuccess, handlePositionError, {
+    navigator.geolocation.getCurrentPosition(handlePositionSuccess, () => {}, { enableHighAccuracy: true, timeout: 15000 });
+    watchIdRef.current = navigator.geolocation.watchPosition(handlePositionSuccess, () => {}, {
       enableHighAccuracy: true,
-      timeout: 15000,
+      timeout: 20000,
       maximumAge: 1000,
     });
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      handlePositionSuccess,
-      handlePositionError,
-      {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 1000,
-      }
-    );
   };
 
   const stopTracking = () => {
@@ -135,12 +88,6 @@ function GpsTrackerContent() {
       </header>
 
       <main className="w-full max-w-md my-auto space-y-5">
-        {errorMessage && (
-          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-medium leading-relaxed">
-            ⚠️ {errorMessage}
-          </div>
-        )}
-
         <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 space-y-3">
           <label className="text-xs font-bold text-white/60 uppercase tracking-wider block">Oturum / Kanal Adı</label>
           <input
@@ -174,10 +121,6 @@ function GpsTrackerContent() {
           <div className="flex justify-between">
             <span className="text-white/40">Koordinat:</span>
             <span className="text-white/80">{gpsData.lat ? `${gpsData.lat.toFixed(5)}, ${gpsData.lng.toFixed(5)}` : '--'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-white/40">Hassasiyet:</span>
-            <span className="text-white/80">{gpsData.accuracy ? `±${gpsData.accuracy}m` : '--'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-white/40">Son Gönderim:</span>

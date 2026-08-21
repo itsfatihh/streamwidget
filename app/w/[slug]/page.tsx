@@ -65,82 +65,51 @@ function ClockWidget() {
   );
 }
 
+// TEK PARÇA OTO-GPS MINI-MAP (Ayrı sayfa yok, kendi konumunu kendi alır)
 function MiniMapWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
-  const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
   const shape = searchParams.shape || 'circle';
   const accent = searchParams.accent || '#53FC18';
   const showSpeed = searchParams.showSpeed !== 'false';
 
   const [pos, setPos] = useState<{ lat: number; lng: number; speed: number; heading: number }>({
-    lat: 49.4875,
-    lng: 8.4660,
+    lat: 43.5221,
+    lng: 3.9191,
     speed: 0,
     heading: 0,
   });
-  const [status, setStatus] = useState<'connecting' | 'live'>('connecting');
+  const [status, setStatus] = useState<'searching' | 'live'>('searching');
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
 
-  // Canlı GPS Dinleyicisi (SSE + Polling Fallback)
+  // Widget açıldığı an doğrudan cihazın GPS'ini dinlemeye başlar
   useEffect(() => {
-    let eventSource: EventSource | null = null;
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) return;
 
-    try {
-      eventSource = new EventSource(`https://ntfy.sh/sw_gps_${channel}/sse`);
-      eventSource.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data);
-          if (parsed && parsed.message) {
-            const data = JSON.parse(parsed.message);
-            if (data.lat && data.lng) {
-              setPos({
-                lat: Number(data.lat),
-                lng: Number(data.lng),
-                speed: Math.round(Number(data.speed || 0)),
-                heading: Number(data.heading || 0),
-              });
-              setStatus('live');
-            }
-          }
-        } catch (e) {}
-      };
-    } catch (e) {}
+    const onPos = (p: GeolocationPosition) => {
+      const lat = p.coords.latitude;
+      const lng = p.coords.longitude;
+      const speed = p.coords.speed !== null && p.coords.speed >= 0 ? Math.round(p.coords.speed * 3.6) : 0;
+      const heading = p.coords.heading !== null && !isNaN(p.coords.heading) ? Math.round(p.coords.heading) : 0;
 
-    // Polling yedek kontrol
-    const pollInterval = setInterval(async () => {
-      try {
-        const res = await fetch(`https://ntfy.sh/sw_gps_${channel}/json?poll=1&since=5s`);
-        if (res.ok) {
-          const text = await res.text();
-          const lines = text.trim().split('\n');
-          for (const line of lines.reverse()) {
-            if (!line) continue;
-            const parsed = JSON.parse(line);
-            if (parsed.message) {
-              const data = JSON.parse(parsed.message);
-              if (data.lat && data.lng) {
-                setPos({
-                  lat: Number(data.lat),
-                  lng: Number(data.lng),
-                  speed: Math.round(Number(data.speed || 0)),
-                  heading: Number(data.heading || 0),
-                });
-                setStatus('live');
-                break;
-              }
-            }
-          }
-        }
-      } catch (e) {}
-    }, 1500);
-
-    return () => {
-      if (eventSource) eventSource.close();
-      clearInterval(pollInterval);
+      setPos({ lat, lng, speed, heading });
+      setStatus('live');
     };
-  }, [channel]);
 
-  // Leaflet Başlatma
+    const onErr = (err: any) => {
+      console.warn('GPS alımı bekleniyor...', err);
+    };
+
+    navigator.geolocation.getCurrentPosition(onPos, onErr, { enableHighAccuracy: true, timeout: 10000 });
+    const watchId = navigator.geolocation.watchPosition(onPos, onErr, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 1000,
+    });
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  // Leaflet Harita Motoru
   useEffect(() => {
     if (typeof window === 'undefined' || !mapContainerRef.current) return;
 
@@ -197,7 +166,7 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
     };
   }, []);
 
-  // Koordinat Değiştiğinde Harita ve Yön Oku Odaklama
+  // Konum değiştikçe haritayı güncelle
   useEffect(() => {
     if (mapInstanceRef.current) {
       mapInstanceRef.current.setView([pos.lat, pos.lng], 16, { animate: true });
@@ -208,7 +177,7 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
     <div className="w-screen h-screen flex items-center justify-center bg-transparent p-4 select-none">
       <div
         className={`relative overflow-hidden border-[3px] shadow-2xl transition-all duration-300 ${
-          shape === 'circle' ? 'w-72 h-72 rounded-full' : 'w-72 h-72 rounded-3xl'
+          shape === 'square' ? 'w-72 h-72 rounded-3xl' : 'w-72 h-72 rounded-full'
         }`}
         style={{
           borderColor: accent,
@@ -216,10 +185,9 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
           boxShadow: `0 0 35px ${accent}45`,
         }}
       >
-        {/* Canlı Harita Katmanı */}
         <div ref={mapContainerRef} className="w-full h-full transform scale-110 pointer-events-none" />
 
-        {/* NFS Radar Izgarası */}
+        {/* Radar Efekti */}
         <div className="absolute inset-0 bg-[radial-gradient(#ffffff15_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
         <div className="absolute inset-0 rounded-full border border-dashed border-white/20 pointer-events-none" />
 
@@ -237,7 +205,7 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
           </div>
         </div>
 
-        {/* Hız Göstergesi */}
+        {/* Hız */}
         {showSpeed && (
           <div className="absolute bottom-3.5 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-md px-3.5 py-1 rounded-xl border border-white/20 flex items-baseline gap-1.5 shadow-2xl pointer-events-none">
             <span className="text-lg font-black font-mono text-white tracking-wider">{pos.speed}</span>
@@ -245,11 +213,11 @@ function MiniMapWidget({ searchParams }: { searchParams: Record<string, string |
           </div>
         )}
 
-        {/* GPS Canlı Durum */}
+        {/* GPS Durum */}
         <div className="absolute top-3.5 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/15 flex items-center gap-1.5 shadow-lg pointer-events-none">
           <div className={`w-1.5 h-1.5 rounded-full ${status === 'live' ? 'bg-emerald-400 animate-ping' : 'bg-amber-400'}`} />
           <span className="text-[9px] font-black tracking-widest text-white/90 uppercase">
-            {status === 'live' ? 'GPS LIVE' : 'SYNCING'}
+            {status === 'live' ? 'GPS LIVE' : 'GPS ARANIYOR'}
           </span>
         </div>
       </div>
@@ -271,15 +239,12 @@ export default function WidgetPage({
   if (['mini-map', 'radar', 'radar-hud', 'map', 'nfs-mini-map'].includes(rawSlug)) {
     return <MiniMapWidget searchParams={resolvedSearchParams} />;
   }
-
   if (['kick-chat', 'chat-box', 'chat'].includes(rawSlug)) {
     return <KickChatWidget searchParams={resolvedSearchParams} />;
   }
-
   if (['kick-viewers', 'viewer-count', 'viewers'].includes(rawSlug)) {
     return <KickViewersWidget searchParams={resolvedSearchParams} />;
   }
-
   if (['clock', 'digital-clock'].includes(rawSlug)) {
     return <ClockWidget />;
   }
