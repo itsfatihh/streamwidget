@@ -8,57 +8,69 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Channel name required" }, { status: 400 });
   }
 
+  const defaultHeaders = {
+    "User-Agent":
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    Accept: "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+  };
+
   try {
-    // 1. Kick v1 API üzerinden sorgula
-    const res = await fetch(`https://kick.com/api/v1/channels/${channel}`, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      const chatroomId = data?.chatroom?.id || data?.id;
-      if (chatroomId) {
-        return NextResponse.json({
-          channel,
-          chatroom_id: String(chatroomId),
-          user_id: data?.user_id || data?.id,
-        });
-      }
-    }
-
-    // 2. Kick v2 API Alternatifi
+    // 1. Kick v2 API üzerinden kanal detaylarını çek
     const resV2 = await fetch(`https://kick.com/api/v2/channels/${channel}`, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        Accept: "application/json",
-      },
+      headers: defaultHeaders,
       cache: "no-store",
     });
 
     if (resV2.ok) {
-      const dataV2 = await resV2.json();
-      const chatroomId = dataV2?.chatroom?.id || dataV2?.id;
-      if (chatroomId) {
-        return NextResponse.json({
-          channel,
-          chatroom_id: String(chatroomId),
-        });
-      }
+      const data = await resV2.json();
+      const chatroomId = data?.chatroom?.id || data?.id;
+      const followersCount =
+        data?.followersCount ??
+        data?.followers_count ??
+        data?.user?.followers_count ??
+        0;
+
+      return NextResponse.json({
+        channel,
+        chatroom_id: chatroomId ? String(chatroomId) : null,
+        followers_count: Number(followersCount),
+        subscribers_count: Number(data?.subscribers_count || 0),
+        user_id: data?.user_id || data?.id,
+      });
+    }
+
+    // 2. Kick v1 API Alternatifi
+    const resV1 = await fetch(`https://kick.com/api/v1/channels/${channel}`, {
+      headers: defaultHeaders,
+      cache: "no-store",
+    });
+
+    if (resV1.ok) {
+      const data = await resV1.json();
+      const chatroomId = data?.chatroom?.id || data?.id;
+      const followersCount =
+        data?.followersCount ??
+        data?.followers_count ??
+        data?.user?.followers_count ??
+        0;
+
+      return NextResponse.json({
+        channel,
+        chatroom_id: chatroomId ? String(chatroomId) : null,
+        followers_count: Number(followersCount),
+        subscribers_count: Number(data?.subscribers_count || 0),
+        user_id: data?.user_id || data?.id,
+      });
     }
 
     return NextResponse.json(
-      { error: "Channel chatroom not found" },
+      { error: "Channel not found", channel, followers_count: 0 },
       { status: 404 }
     );
   } catch (err: any) {
     return NextResponse.json(
-      { error: "Failed to resolve kick channel", details: err.message },
+      { error: "Failed to resolve kick channel", details: err.message, followers_count: 0 },
       { status: 500 }
     );
   }
