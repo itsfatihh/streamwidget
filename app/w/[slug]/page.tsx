@@ -259,49 +259,45 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
     let ws: WebSocket | null = null;
     let keepAlive: any = null;
 
-    const chatroomId = "1917711";
-
     ws = new WebSocket("wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false");
 
     ws.onopen = () => {
-      // Chatroom v2 kanalına abone ol
-      ws?.send(JSON.stringify({
-        event: "pusher:subscribe",
-        data: { auth: "", channel: "chatrooms." + chatroomId + ".v2" }
-      }));
+      // Kick in kullanabilecegi tum kanal formatlarina tek seferde abone oluyoruz
+      const channelsToSub = [
+        "chatrooms.1917711.v2",
+        "chatrooms.1917711",
+        "channel.1917711",
+        "channel.itsfatih"
+      ];
+      channelsToSub.forEach((ch) => {
+        ws?.send(JSON.stringify({
+          event: "pusher:subscribe",
+          data: { auth: "", channel: ch }
+        }));
+      });
     };
 
     ws.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data);
-        const ev = parsed.event || "";
+        const ev = String(parsed.event || "");
 
-        // 1. Kick Arayüzünden Mesaj Sabitlendiğinde
-        if (
-          ev.includes("PinnedMessageCreatedEvent") ||
-          ev.includes("ChatMessagePinnedEvent") ||
-          ev.includes("PinnedMessage") ||
-          (ev.toLowerCase().includes("pinned") && !ev.toLowerCase().includes("unpin") && !ev.toLowerCase().includes("delete"))
-        ) {
-          const pData = typeof parsed.data === "string" ? JSON.parse(parsed.data) : parsed.data;
-          const msg = pData.pinned_message || pData.message || pData;
+        // 1. Kick Pin Olayi
+        if (ev.toLowerCase().includes("pin") && !ev.toLowerCase().includes("ping")) {
+          if (ev.toLowerCase().includes("unpin") || ev.toLowerCase().includes("delet")) {
+            setPinned(null);
+            return;
+          }
 
-          const senderName =
-            msg.sender?.username ||
-            msg.user?.username ||
-            msg.author?.username ||
-            "Moderatör";
+          let payload = parsed.data;
+          if (typeof payload === "string") {
+            try { payload = JSON.parse(payload); } catch(e) {}
+          }
 
-          const msgText =
-            msg.content ||
-            msg.message?.content ||
-            msg.message ||
-            "";
-
-          const userColor =
-            msg.sender?.identity?.color ||
-            msg.user?.identity?.color ||
-            accent;
+          const msg = payload.pinned_message || payload.message || payload;
+          const senderName = msg.sender?.username || msg.user?.username || "Moderatör";
+          const msgText = msg.content || msg.message?.content || msg.message || "";
+          const userColor = msg.sender?.identity?.color || accent;
 
           if (msgText) {
             setPinned({
@@ -313,17 +309,6 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
             playPingSound();
           }
         }
-
-        // 2. Kick Arayüzünden Sabitleme Kaldırıldığında
-        if (
-          ev.includes("PinnedMessageDeletedEvent") ||
-          ev.includes("ChatMessageUnpinnedEvent") ||
-          ev.toLowerCase().includes("unpinned") ||
-          ev.toLowerCase().includes("unpin") ||
-          ev.toLowerCase().includes("pinneddeleted")
-        ) {
-          setPinned(null);
-        }
       } catch (err) {}
     };
 
@@ -331,7 +316,7 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ event: "pusher:ping", data: {} }));
       }
-    }, 25000);
+    }, 20000);
 
     return () => {
       if (ws) ws.close();
