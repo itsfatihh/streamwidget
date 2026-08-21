@@ -1,190 +1,187 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import React, { useState, use, useMemo } from 'react';
 import Link from 'next/link';
-import { WIDGETS_LIST, WidgetDef } from '@/lib/widgets';
-import { LangCode, UI_TEXTS } from '@/lib/i18n';
-import HeaderControls from '@/components/HeaderControls';
+import { notFound } from 'next/navigation';
+import { WIDGETS_LIST } from '@/lib/widgets';
 
 export default function BuilderPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
-  const [lang, setLang] = useState<LangCode>('en');
-  const [copied, setCopied] = useState(false);
-  const [origin, setOrigin] = useState('');
+  const widget = WIDGETS_LIST.find((w: any) => w.id === slug);
 
-  const widgetDef: WidgetDef | undefined = WIDGETS_LIST.find((w) => w.id === slug);
-
-  const [formValues, setFormValues] = useState<Record<string, any>>(() => {
-    const defaults: Record<string, any> = {};
-    if (widgetDef) {
-      widgetDef.fields.forEach((f) => {
-        defaults[f.name] = f.defaultValue ?? '';
-      });
-    }
-    return defaults;
-  });
-
-  useEffect(() => {
-    const savedLang = (localStorage.getItem('sw_lang') as LangCode) || 'en';
-    setLang(savedLang);
-    setOrigin(window.location.origin);
-
-    const onLangChange = () => {
-      const updated = (localStorage.getItem('sw_lang') as LangCode) || 'en';
-      setLang(updated);
-    };
-    window.addEventListener('sw_lang_changed', onLangChange);
-    return () => window.removeEventListener('sw_lang_changed', onLangChange);
-  }, []);
-
-  if (!widgetDef) {
-    return (
-      <div className="min-h-screen flex items-center justify-center font-bold" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}>
-        Widget Not Found
-      </div>
-    );
+  if (!widget) {
+    notFound();
   }
 
-  const t = UI_TEXTS[lang] || UI_TEXTS.en;
+  const [copied, setCopied] = useState(false);
 
-  const queryString = new URLSearchParams(
-    Object.entries(formValues).reduce((acc, [k, v]) => {
-      if (v !== undefined && v !== '') acc[k] = String(v);
-      return acc;
-    }, {} as Record<string, string>)
-  ).toString();
+  // Form State
+  const initialConfig = useMemo(() => {
+    const conf: Record<string, string> = {};
+    widget.fields.forEach((f: any) => {
+      conf[f.name] = f.defaultValue;
+    });
+    return conf;
+  }, [widget]);
 
-  const previewUrl = `/w/${widgetDef.id}${queryString ? `?${queryString}` : ''}`;
-  const fullObsUrl = `${origin}${previewUrl}`;
+  const [config, setConfig] = useState<Record<string, string>>(initialConfig);
+
+  const handleChange = (name: string, value: string) => {
+    setConfig((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // URL Query Üretici
+  const queryParams = new URLSearchParams(config).toString();
+  const widgetUrl = `https://www.streamwidget.live/w/${widget.id}${queryParams ? `?${queryParams}` : ''}`;
+  const previewUrl = `/w/${widget.id}${queryParams ? `?${queryParams}` : ''}`;
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(fullObsUrl);
+    navigator.clipboard.writeText(widgetUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans select-none" style={{ backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}>
-      {/* Header */}
-      <header className="px-8 py-5 flex items-center justify-between border-b" style={{ borderColor: 'var(--border-color)' }}>
-        <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-black tracking-widest text-sm">STREAMWIDGET</span>
-        </Link>
-        <HeaderControls lang={lang} onLangChange={setLang} />
-      </header>
-
-      {/* Main Builder */}
-      <main className="max-w-6xl w-full mx-auto px-6 py-10 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div className="min-h-screen bg-[#07090e] text-white p-4 md:p-8 flex flex-col items-center justify-center font-sans">
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
         {/* Sol Panel: Ayarlar */}
-        <div
-          className="lg:col-span-5 border rounded-3xl p-6 flex flex-col justify-between shadow-sm space-y-6"
-          style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-color)' }}
-        >
-          <div className="space-y-6">
-            <div className="space-y-1.5">
-              <Link href="/" className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline">
-                ← {t.backToHome}
-              </Link>
-              <h2 className="text-xl font-black">{widgetDef.name[lang] || widgetDef.name.en}</h2>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {widgetDef.description[lang] || widgetDef.description.en}
-              </p>
-            </div>
-
-            {/* Form Alanları */}
-            <div className="space-y-4 pt-2">
-              {widgetDef.fields.map((field) => (
-                <div key={field.name} className="space-y-1.5">
-                  <label className="text-xs font-bold" style={{ color: 'var(--text-main)' }}>
-                    {field.label[lang] || field.label.en}
-                  </label>
-                  {field.type === 'select' ? (
-                    <select
-                      value={formValues[field.name]}
-                      onChange={(e) => setFormValues({ ...formValues, [field.name]: e.target.value })}
-                      className="w-full border rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500"
-                      style={{
-                        backgroundColor: 'var(--bg-input)',
-                        borderColor: 'var(--border-color)',
-                        color: 'var(--text-main)',
-                      }}
-                    >
-                      {field.options?.map((opt) => (
-                        <option key={opt.value} value={opt.value} className="bg-zinc-900 text-white">
-                          {opt.label[lang] || opt.label.en}
-                        </option>
-                      ))}
-                    </select>
-                  ) : field.type === 'color' ? (
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={formValues[field.name]}
-                        onChange={(e) => setFormValues({ ...formValues, [field.name]: e.target.value })}
-                        className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0"
-                      />
-                      <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
-                        {formValues[field.name]}
-                      </span>
-                    </div>
-                  ) : (
-                    <input
-                      type={field.type}
-                      value={formValues[field.name]}
-                      placeholder={field.placeholder}
-                      onChange={(e) => setFormValues({ ...formValues, [field.name]: e.target.value })}
-                      className="w-full border rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-emerald-500"
-                      style={{
-                        backgroundColor: 'var(--bg-input)',
-                        borderColor: 'var(--border-color)',
-                        color: 'var(--text-main)',
-                      }}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
+        <div className="lg:col-span-5 bg-[#0f131c] border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col gap-6">
+          <div>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors mb-4"
+            >
+              ← Widget Listesine Dön
+            </Link>
+            <h1 className="text-2xl font-black tracking-tight text-white">{widget.name.tr}</h1>
+            <p className="text-xs text-white/60 mt-1.5 leading-relaxed">{widget.description.tr}</p>
           </div>
 
-          {/* OBS URL Kopyalama */}
-          <div className="pt-6 border-t space-y-2" style={{ borderColor: 'var(--border-color)' }}>
-            <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-              {t.obsUrl}
+          <div className="flex flex-col gap-4">
+            {widget.fields.map((field: any) => (
+              <div key={field.name} className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-white/80">{field.label.tr}</label>
+                
+                {field.type === 'select' && (
+                  <select
+                    value={config[field.name]}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
+                    className="w-full bg-[#161c28] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all cursor-pointer"
+                  >
+                    {field.options?.map((opt: any) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label.tr}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                {field.type === 'text' && (
+                  <input
+                    type="text"
+                    value={config[field.name]}
+                    onChange={(e) => handleChange(field.name, e.target.value)}
+                    className="w-full bg-[#161c28] border border-white/10 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition-all placeholder:text-white/30"
+                  />
+                )}
+
+                {field.type === 'color' && (
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={config[field.name]}
+                      onChange={(e) => handleChange(field.name, e.target.value)}
+                      className="w-10 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer"
+                    />
+                    <span className="text-xs font-mono text-white/60">{config[field.name]}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* OBS Linki Kopyalama */}
+          <div className="pt-4 border-t border-white/10 flex flex-col gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white/50">
+              OBS Tarayıcı Kaynağı Linki
             </span>
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 readOnly
-                value={fullObsUrl}
-                className="w-full border rounded-xl px-3 py-2 text-xs font-mono select-all outline-none"
-                style={{
-                  backgroundColor: 'var(--bg-input)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-main)',
-                }}
+                value={widgetUrl}
+                className="w-full bg-[#161c28] border border-white/10 rounded-xl px-3.5 py-2 text-xs font-mono text-white/70 focus:outline-none select-all"
               />
               <button
                 onClick={copyToClipboard}
-                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl transition-all whitespace-nowrap active:scale-95"
+                className="shrink-0 bg-emerald-500 hover:bg-emerald-400 text-black font-bold px-4 py-2 rounded-xl text-xs transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
               >
-                {copied ? t.copied : t.copyUrl}
+                {copied ? 'Kopyalandı!' : 'Linki Kopyala'}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Sağ Panel: Canlı Önizleme */}
-        <div className="lg:col-span-7 bg-[#0a0d14] border border-white/10 rounded-3xl p-6 flex flex-col justify-between relative overflow-hidden min-h-[420px] shadow-2xl">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4 z-10">
-            <span className="text-xs font-bold text-white/50 uppercase tracking-widest">{t.livePreview}</span>
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+        {/* Sağ Panel: Canlı Önizleme ve Chat Komutları */}
+        <div className="lg:col-span-7 bg-[#0b0e14] border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col">
+          <div className="flex items-center justify-between pb-4 mb-4 border-b border-white/10">
+            <span className="text-xs font-bold uppercase tracking-widest text-white/50">
+              Canlı Önizleme
+            </span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
           </div>
-          <div className="flex-1 w-full h-full relative rounded-2xl overflow-hidden bg-black/40 border border-white/5 flex items-center justify-center">
-            <iframe src={previewUrl} className="w-full h-full border-0 absolute inset-0 pointer-events-none" />
+
+          {/* Iframe Önizleme Alanı */}
+          <div className="w-full h-[220px] bg-black/60 rounded-xl border border-white/5 overflow-hidden flex items-center justify-center relative">
+            <iframe
+              src={previewUrl}
+              className="w-full h-full border-0 pointer-events-none bg-transparent"
+              title="Widget Preview"
+            />
           </div>
+
+          {/* IRL HUD Chat Komutları Tablosu */}
+          {slug === 'irl-hud' && (
+            <div className="w-full mt-5 p-4 rounded-xl bg-[#121622] border border-white/10 text-left">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-white/90">
+                  Kick Chat Komutları (Yayıncı & Mod)
+                </h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs font-mono">
+                <div className="bg-black/50 p-2.5 rounded-lg border border-white/5 flex flex-col justify-center">
+                  <span className="text-emerald-400 font-bold">!location &lt;şehir&gt;</span>
+                  <span className="text-white/60 text-[11px] font-sans mt-0.5">Konumu ve havayı girilen şehre ayarlar</span>
+                </div>
+                <div className="bg-black/50 p-2.5 rounded-lg border border-white/5 flex flex-col justify-center">
+                  <span className="text-emerald-400 font-bold">!autolocation</span>
+                  <span className="text-white/60 text-[11px] font-sans mt-0.5">Otomatik IP konumuna geri döner</span>
+                </div>
+                <div className="bg-black/50 p-2.5 rounded-lg border border-white/5 flex flex-col justify-center">
+                  <span className="text-amber-400 font-bold">!setlive on / off</span>
+                  <span className="text-white/60 text-[11px] font-sans mt-0.5">LIVE rozetini açar / kapatır</span>
+                </div>
+                <div className="bg-black/50 p-2.5 rounded-lg border border-white/5 flex flex-col justify-center">
+                  <span className="text-amber-400 font-bold">!setclock on / off</span>
+                  <span className="text-white/60 text-[11px] font-sans mt-0.5">Canlı saati açar / kapatır</span>
+                </div>
+                <div className="bg-black/50 p-2.5 rounded-lg border border-white/5 flex flex-col justify-center">
+                  <span className="text-amber-400 font-bold">!setloc on / off</span>
+                  <span className="text-white/60 text-[11px] font-sans mt-0.5">Konum göstergesini açar / kapatır</span>
+                </div>
+                <div className="bg-black/50 p-2.5 rounded-lg border border-white/5 flex flex-col justify-center">
+                  <span className="text-amber-400 font-bold">!setweather on / off</span>
+                  <span className="text-white/60 text-[11px] font-sans mt-0.5">Hava durumunu açar / kapatır</span>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
-      </main>
+
+      </div>
     </div>
   );
 }
