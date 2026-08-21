@@ -25,6 +25,16 @@ const CHANNEL_CHATROOM_MAP: Record<string, string> = {
   kendinemuzisyen: '2437618',
 };
 
+// Kick Orijinal Global Rozetler
+const KICK_GLOBAL_BADGES: Record<string, string> = {
+  broadcaster: 'https://kick.com/images/badges/broadcaster.svg',
+  moderator: 'https://kick.com/images/badges/moderator.svg',
+  vip: 'https://kick.com/images/badges/vip.svg',
+  og: 'https://kick.com/images/badges/og.svg',
+  founder: 'https://kick.com/images/badges/founder.svg',
+  verified: 'https://kick.com/images/badges/verified.svg',
+};
+
 export default function KickChatWidget({ searchParams }: { searchParams: Record<string, string | undefined> }) {
   const channel = (searchParams.channel || 'itsfatih').toLowerCase().trim();
   const theme = searchParams.theme || 'minimal';
@@ -40,82 +50,74 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     let pingInterval: any = null;
     let isCancelled = false;
 
-    const startChat = async () => {
-      let chatroomId = CHANNEL_CHATROOM_MAP[channel] || '1917711';
-
-      try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.chatroom_id) {
-            chatroomId = String(data.chatroom_id);
-          }
-          if (data && data.subscriber_badges) {
-            setSubBadges(data.subscriber_badges);
-          }
+    // 1. Kanal Rozetlerini Arka Planda Sessizce Çek (WebSocket'i bekletmez)
+    fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isCancelled && data?.subscriber_badges) {
+          setSubBadges(data.subscriber_badges);
         }
-      } catch (e) {}
+      })
+      .catch(() => {});
 
-      if (channel === 'batuhankaradeniz' || channel === 'cavs') chatroomId = '2437618';
-      if (channel === 'itsfatih') chatroomId = '1917711';
+    // 2. Chatroom ID Belirle & Soketi Anında Başlat
+    let chatroomId = CHANNEL_CHATROOM_MAP[channel] || '1917711';
 
-      if (isCancelled) return;
+    ws = new WebSocket(
+      'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0-rc2&flash=false'
+    );
 
-      ws = new WebSocket(
-        'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0-rc2&flash=false'
-      );
-
-      const subscribe = () => {
-        ws?.send(
+    const subscribe = (roomId: string) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(
           JSON.stringify({
             event: 'pusher:subscribe',
-            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
+            data: { auth: '', channel: `chatrooms.${roomId}.v2` }
           })
         );
-      };
-
-      ws.onopen = () => {
-        subscribe();
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-
-          if (payload.event === 'pusher:connection_established') {
-            subscribe();
-          }
-
-          if (payload.event && payload.event.includes('ChatMessageEvent')) {
-            let data = payload.data;
-            if (typeof data === 'string') {
-              data = JSON.parse(data);
-            }
-
-            const sender = data.sender || {};
-            const identity = sender.identity || {};
-
-            const newMsg: ChatMessage = {
-              id: String(data.id || Date.now() + Math.random()),
-              user: sender.username || 'Kullanıcı',
-              content: data.content || '',
-              color: identity.color || '#53FC18',
-              badges: identity.badges || [],
-            };
-
-            setMessages((prev) => [...prev.slice(-40), newMsg]);
-          }
-        } catch (err) {}
-      };
-
-      pingInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
-        }
-      }, 15000);
+      }
     };
 
-    startChat();
+    ws.onopen = () => {
+      subscribe(chatroomId);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+
+        if (payload.event === 'pusher:connection_established') {
+          subscribe(chatroomId);
+        }
+
+        if (payload.event && payload.event.includes('ChatMessageEvent')) {
+          let data = payload.data;
+          if (typeof data === 'string') {
+            data = JSON.parse(data);
+          }
+
+          const sender = data.sender || {};
+          const identity = sender.identity || {};
+
+          const newMsg: ChatMessage = {
+            id: String(data.id || Date.now() + Math.random()),
+            user: sender.username || 'Kullanıcı',
+            content: data.content || '',
+            color: identity.color || '#53FC18',
+            badges: identity.badges || [],
+          };
+
+          setMessages((prev) => [...prev.slice(-40), newMsg]);
+        }
+      } catch (err) {}
+    };
+
+    // Pusher Canlı Tutma Pingi (15sn)
+    pingInterval = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
+      }
+    }, 15000);
 
     return () => {
       isCancelled = true;
@@ -130,17 +132,17 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
     }
   }, [messages]);
 
-  // Kanalın Orijinal Rozetini Basan Fonksiyon
+  // Rozet Render Fonksiyonu
   const renderBadge = (badge: ChatBadge, idx: number): React.ReactNode => {
     const type = badge.type?.toLowerCase() || '';
 
-    // 1. Abone Rozeti: Yayıncının yüklediği orijinal görseli (bot vs.) göster
+    // Abone Rozeti
     if (type === 'subscriber' || type === 'sub') {
       const months = badge.count ?? 1;
-      
+
+      // Özel görsel varsa bas
       let badgeUrl = subBadges[months];
       if (!badgeUrl) {
-        // En yakın alt kademe ayını bul (örn: 2 aylık abone ise 2 ay rozeti, 5 ise 3 ay rozeti)
         const sortedMonths = Object.keys(subBadges).map(Number).sort((a, b) => b - a);
         const match = sortedMonths.find((m) => months >= m);
         if (match) badgeUrl = subBadges[match];
@@ -151,14 +153,13 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
           <img
             key={idx}
             src={badgeUrl}
-            alt={`${months} Ay Abone`}
-            title={`${months} Ay Abone`}
+            alt={`${months} Ay`}
             className="inline-block h-4 w-4 object-contain align-middle mx-0.5 rounded-[2px]"
           />
         );
       }
 
-      // Görsel yüklenmemişse orijinal yeşil Kick çerçeveli kutu
+      // Orijinal Kick Rozet Kutusu Fallback
       return (
         <span
           key={idx}
@@ -169,46 +170,26 @@ export default function KickChatWidget({ searchParams }: { searchParams: Record<
       );
     }
 
-    // 2. VIP Rozeti
-    if (type === 'vip') {
+    // Global Rozetler
+    const globalUrl = KICK_GLOBAL_BADGES[type];
+    if (globalUrl) {
       return (
-        <span key={idx} title="VIP" className="inline-flex items-center justify-center bg-[#a855f7] text-white font-black text-[9px] px-1 py-[1px] rounded-[3px] leading-none">
-          VIP
-        </span>
-      );
-    }
-
-    // 3. Moderatör Rozeti
-    if (type === 'moderator' || type === 'mod') {
-      return (
-        <span key={idx} title="Moderatör" className="inline-flex items-center justify-center bg-[#00e59b] text-black font-black text-[9px] px-1 py-[1px] rounded-[3px] leading-none">
-          MOD
-        </span>
-      );
-    }
-
-    // 4. Yayıncı Rozeti
-    if (type === 'broadcaster') {
-      return (
-        <span key={idx} title="Yayıncı" className="inline-flex items-center justify-center bg-[#53FC18] text-black font-black text-[9px] px-1 py-[1px] rounded-[3px] leading-none">
-          HOST
-        </span>
-      );
-    }
-
-    // 5. OG / Kurucu Rozeti
-    if (type === 'og' || type === 'founder') {
-      return (
-        <span key={idx} title="OG" className="inline-flex items-center justify-center bg-[#3b82f6] text-white font-black text-[9px] px-1 py-[1px] rounded-[3px] leading-none">
-          OG
-        </span>
+        <img
+          key={idx}
+          src={globalUrl}
+          alt={type}
+          className="inline-block h-4 w-auto align-middle object-contain mx-0.5"
+          onError={(e) => {
+            (e.target as HTMLElement).style.display = 'none';
+          }}
+        />
       );
     }
 
     return null;
   };
 
-  // Emote Parser: [emote:12345:name] -> CDN <img>
+  // Kick Emote Parser: [emote:12345:name] -> CDN <img>
   const renderParsedContent = (content: string): React.ReactNode => {
     const emoteRegex = /\[emote:(\d+):([a-zA-Z0-9_-]+)\]/g;
     const parts: React.ReactNode[] = [];
