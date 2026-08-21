@@ -3,17 +3,21 @@
 import React, { useState, useEffect } from 'react';
 
 export default function IrlHudWidget({ searchParams }: { searchParams: Record<string, any> }) {
-  // Açık/Kapalı durumlarını tüm varyasyonlarıyla doğru parse et
-  const isEnabled = (val: any) => {
-    if (val === undefined || val === null) return true;
-    const str = String(val).trim().toLowerCase();
-    return str === 'true' || str === '1' || str === 'enabled' || str === 'açık' || str === 'open';
+  // Parametreleri kesin kontrol et
+  const parseBool = (key: string, altKey?: string) => {
+    const val = searchParams?.[key] ?? (altKey ? searchParams?.[altKey] : undefined);
+    if (val === undefined || val === null || val === '') return true;
+    const str = String(val).toLowerCase().trim();
+    if (str === 'false' || str === 'kapalı' || str === 'disabled' || str === '0' || str === 'off') {
+      return false;
+    }
+    return true;
   };
 
-  const showBadge = isEnabled(searchParams?.show_live);
-  const showClock = isEnabled(searchParams?.show_clock);
-  const showLocation = isEnabled(searchParams?.show_location);
-  const showWeather = isEnabled(searchParams?.show_weather);
+  const showBadge = parseBool('show_live', 'live');
+  const showClock = parseBool('show_clock', 'clock');
+  const showLocation = parseBool('show_location', 'location');
+  const showWeather = parseBool('show_weather', 'weather');
   const theme = searchParams?.theme || 'capsule';
 
   const [time, setTime] = useState<string>('');
@@ -23,7 +27,6 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
     icon: '🌤️',
   });
 
-  // Canlı Saat
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -41,7 +44,6 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
     return () => clearInterval(interval);
   }, []);
 
-  // IP Tabanlı Konum ve Hava Durumu
   useEffect(() => {
     let isCancelled = false;
 
@@ -70,13 +72,9 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
     };
   }, []);
 
-  // Eğer tüm elemanlar kapatıldıysa boş render et
+  // Hiçbir öğe seçili değilse boş göster
   if (!showBadge && !showClock && !showLocation && !showWeather) {
-    return (
-      <div className="w-full h-full flex items-center justify-center p-4 bg-transparent select-none">
-        <span className="text-white/30 text-xs italic">Tüm modüller kapatıldı</span>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -98,7 +96,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
 
         {/* Canlı Saat */}
         {showClock && (
-          <div className={`flex items-center gap-1.5 px-2 py-0.5 ${showLocation || showWeather ? 'border-r border-white/10 pr-3' : ''}`}>
+          <div className={`flex items-center gap-1.5 px-2 py-0.5 ${(showLocation || showWeather) ? 'border-r border-white/10 pr-3' : ''}`}>
             <span className="text-xs">🕒</span>
             <span className="text-xs font-mono font-bold tracking-tight text-white/90">
               {time || '00:00:00'}
@@ -116,7 +114,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
 
         {/* Hava Durumu */}
         {showWeather && (
-          <div className={`flex items-center gap-1.5 pl-2 ${showLocation || showClock ? 'border-l border-white/10' : ''}`}>
+          <div className={`flex items-center gap-1.5 pl-2 ${(showLocation || showClock) ? 'border-l border-white/10' : ''}`}>
             <span className="text-sm">{weather.icon}</span>
             <span className="text-xs font-bold text-emerald-400 font-mono">{weather.temp}</span>
           </div>
