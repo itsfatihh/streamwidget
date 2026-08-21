@@ -2,36 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 
-const isEnabled = (val: any, defaultVal = true): boolean => {
-  if (val === undefined || val === null || val === '') return defaultVal;
-  if (val === false || val === 'false' || val === '0' || val === 'hide') return false;
-  return true;
-};
-
 export default function IrlHudWidget({ searchParams }: { searchParams: Record<string, any> }) {
-  const channel = (searchParams?.channel || 'itsfatih').toLowerCase().trim();
-  const theme = searchParams?.theme || 'framed';
+  const showBadge = searchParams?.show_live !== 'false' && searchParams?.show_live !== 'Kapalı';
+  const showClock = searchParams?.show_clock !== 'false' && searchParams?.show_clock !== 'Kapalı';
+  const showLocation = searchParams?.show_location !== 'false' && searchParams?.show_location !== 'Kapalı';
+  const showWeather = searchParams?.show_weather !== 'false' && searchParams?.show_weather !== 'Kapalı';
+  const theme = searchParams?.theme || 'capsule';
 
-  const [showLive, setShowLive] = useState<boolean>(isEnabled(searchParams?.showLive, true));
-  const [showClock, setShowClock] = useState<boolean>(isEnabled(searchParams?.showClock, true));
-  const [showLocation, setShowLocation] = useState<boolean>(isEnabled(searchParams?.showLocation, true));
-  const [showWeather, setShowWeather] = useState<boolean>(isEnabled(searchParams?.showWeather, true));
+  const [time, setTime] = useState<string>('');
+  const [location, setLocation] = useState<string>('İstanbul, TR');
+  const [weather, setWeather] = useState<{ temp: string; icon: string }>({
+    temp: '22°C',
+    icon: '☀️',
+  });
 
-  const [commandCity, setCommandCity] = useState<string>('');
-  const [displayCity, setDisplayCity] = useState<string>('Konum alınıyor...');
-  const [temp, setTemp] = useState<number | null>(null);
-  const [time, setTime] = useState<string>('00:00:00');
-
+  // Saat Güncelleme
   useEffect(() => {
-    setShowLive(isEnabled(searchParams?.showLive, true));
-    setShowClock(isEnabled(searchParams?.showClock, true));
-    setShowLocation(isEnabled(searchParams?.showLocation, true));
-    setShowWeather(isEnabled(searchParams?.showWeather, true));
-  }, [searchParams]);
-
-  // 1. Canlı Saat
-  useEffect(() => {
-    if (!showClock) return;
     const updateTime = () => {
       const now = new Date();
       setTime(
@@ -39,259 +25,73 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
-          hour12: false,
         })
       );
     };
-
     updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, [showClock]);
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-  // 2. IP veya Komut Konumu ve Hava Durumu
+  // IP Tabanlı Konum ve Hava Durumu Çekme
   useEffect(() => {
-    if (!showLocation && !showWeather) return;
-
-    let isCancelled = false;
-
-    const fetchLocationAndWeather = async () => {
+    async function fetchGeoAndWeather() {
       try {
-        let lat: number | null = null;
-        let lon: number | null = null;
-        let cityName = '';
-
-        if (commandCity) {
-          cityName = commandCity;
-          const geoRes = await fetch(
-            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(commandCity)}&count=1&language=tr&format=json`
-          );
-          if (geoRes.ok) {
-            const geoData = await geoRes.json();
-            if (geoData.results && geoData.results[0]) {
-              lat = geoData.results[0].latitude;
-              lon = geoData.results[0].longitude;
-              cityName = geoData.results[0].name;
-            }
-          }
-        } else {
-          const ipRes = await fetch('https://ipwho.is/');
-          if (ipRes.ok) {
-            const ipData = await ipRes.json();
-            if (ipData.success) {
-              cityName = ipData.city || ipData.region || 'Konum';
-              lat = ipData.latitude;
-              lon = ipData.longitude;
-            }
-          }
-        }
-
-        if (isCancelled) return;
-        setDisplayCity(cityName || 'Konum');
-
-        if (lat !== null && lon !== null) {
-          const weatherRes = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
-          );
-          if (weatherRes.ok) {
-            const wData = await weatherRes.json();
-            if (!isCancelled && wData.current_weather) {
-              setTemp(Math.round(wData.current_weather.temperature));
-            }
-          }
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          setDisplayCity(commandCity || 'Konum');
-        }
-      }
-    };
-
-    fetchLocationAndWeather();
-    const interval = setInterval(fetchLocationAndWeather, 300000);
-
-    return () => {
-      isCancelled = true;
-      clearInterval(interval);
-    };
-  }, [showLocation, showWeather, commandCity]);
-
-  // 3. Evrensel Dinamik Kick Kanalı Chat Dinleyicisi
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let pingInterval: any = null;
-    let isCancelled = false;
-
-    const connectToChannelChat = async () => {
-      let chatroomId = '';
-
-      try {
-        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
+        const res = await fetch('/api/weather', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          if (data?.chatroom_id) {
-            chatroomId = String(data.chatroom_id);
-          }
+          if (data?.city) setLocation(`${data.city}, ${data.country || 'TR'}`);
+          if (data?.temp) setWeather({ temp: `${Math.round(data.temp)}°C`, icon: data.icon || '🌤️' });
         }
       } catch (e) {
-        console.error('Kick channel resolution error:', e);
+        // Hata durumunda varsayılan önizleme verileri korunur
       }
-
-      if (isCancelled || !chatroomId) return;
-
-      ws = new WebSocket(
-        'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.4.0-rc2&flash=false'
-      );
-
-      const subscribe = () => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(
-            JSON.stringify({
-              event: 'pusher:subscribe',
-              data: { auth: '', channel: `chatrooms.${chatroomId}.v2` },
-            })
-          );
-        }
-      };
-
-      ws.onopen = () => {
-        subscribe();
-      };
-
-      ws.onmessage = (event) => {
-        if (isCancelled) return;
-        try {
-          const payload = JSON.parse(event.data);
-
-          if (payload.event === 'pusher:connection_established') {
-            subscribe();
-          }
-
-          if (payload.event && payload.event.includes('ChatMessageEvent')) {
-            let data = payload.data;
-            if (typeof data === 'string') data = JSON.parse(data);
-
-            const content = (data.content || '').trim();
-            const sender = data.sender || {};
-            const badges = sender.identity?.badges || [];
-
-            const isAuthorized =
-              sender.username?.toLowerCase() === channel ||
-              badges.some((b: any) =>
-                ['broadcaster', 'moderator', 'mod'].includes(b.type?.toLowerCase())
-              );
-
-            if (!isAuthorized) return;
-
-            if (content.toLowerCase().startsWith('!location ') || content.toLowerCase().startsWith('!city ')) {
-              const newLoc = content.replace(/^!(location|city)\s+/i, '').trim();
-              if (newLoc) setCommandCity(newLoc);
-            } else if (
-              content.toLowerCase() === '!autolocation' ||
-              content.toLowerCase() === '!otolocation' ||
-              content.toLowerCase() === '!clearcity' ||
-              content.toLowerCase() === '!resetcity'
-            ) {
-              setCommandCity('');
-            } else if (content.toLowerCase() === '!setlive on') {
-              setShowLive(true);
-            } else if (content.toLowerCase() === '!setlive off') {
-              setShowLive(false);
-            } else if (content.toLowerCase() === '!setclock on') {
-              setShowClock(true);
-            } else if (content.toLowerCase() === '!setclock off') {
-              setShowClock(false);
-            } else if (content.toLowerCase() === '!setloc on') {
-              setShowLocation(true);
-            } else if (content.toLowerCase() === '!setloc off') {
-              setShowLocation(false);
-            } else if (content.toLowerCase() === '!setweather on') {
-              setShowWeather(true);
-            } else if (content.toLowerCase() === '!setweather off') {
-              setShowWeather(false);
-            }
-          }
-        } catch (err) {}
-      };
-
-      pingInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
-        }
-      }, 15000);
-    };
-
-    connectToChannelChat();
-
-    return () => {
-      isCancelled = true;
-      if (ws) ws.close();
-      if (pingInterval) clearInterval(pingInterval);
-    };
-  }, [channel]);
-
-  const items: React.ReactNode[] = [];
-
-  if (showLive) {
-    items.push(
-      <div key="live" className="flex items-center gap-1.5 shrink-0">
-        <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-        <span className="font-extrabold text-xs tracking-wider text-red-500">LIVE</span>
-      </div>
-    );
-  }
-
-  if (showClock) {
-    items.push(
-      <span key="clock" className="font-mono font-bold text-white text-xs tracking-wider shrink-0">
-        {time}
-      </span>
-    );
-  }
-
-  if (showLocation) {
-    items.push(
-      <div key="location" className="flex items-center gap-1 text-xs font-semibold text-white/95 shrink-0">
-        <span>📍</span>
-        <span>{displayCity}</span>
-      </div>
-    );
-  }
-
-  if (showWeather) {
-    items.push(
-      <div key="weather" className="flex items-center gap-1.5 text-xs font-bold text-amber-400 shrink-0">
-        <span>🌤️</span>
-        <span>{temp !== null ? `${temp}°C` : '...'}</span>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="w-screen h-screen flex items-start justify-start p-6 bg-transparent select-none">
-        <span className="text-xs text-white/40 italic p-2 border border-dashed border-white/20 rounded-lg">
-          (HUD Gizlendi)
-        </span>
-      </div>
-    );
-  }
+    }
+    fetchGeoAndWeather();
+  }, []);
 
   return (
-    <div className="w-screen h-screen flex items-start justify-start p-6 bg-transparent select-none font-sans">
+    <div className="w-full h-full flex items-start justify-start p-4 bg-transparent select-none font-sans">
       <div
-        className={`inline-flex items-center gap-3 px-4 py-2 text-white font-medium text-sm transition-all duration-300 ${
-          theme === 'framed'
-            ? 'bg-[#090b10]/95 backdrop-blur-xl border border-white/10 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.7)]'
-            : 'bg-black/60 rounded-full px-3 py-1.5'
+        className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl border backdrop-blur-xl shadow-2xl transition-all ${
+          theme === 'minimal'
+            ? 'bg-black/60 border-white/5 text-white'
+            : 'bg-[#0b0e14]/90 border-white/10 text-white'
         }`}
       >
-        {items.map((item, index) => (
-          <React.Fragment key={index}>
-            {index > 0 && <span className="text-white/20 select-none">|</span>}
-            {item}
-          </React.Fragment>
-        ))}
+        {/* Canlı Rozeti */}
+        {showBadge && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+            <span className="text-[10px] font-black tracking-widest uppercase">LIVE</span>
+          </div>
+        )}
+
+        {/* Canlı Saat */}
+        {showClock && (
+          <div className="flex items-center gap-1.5 px-2 py-0.5 border-r border-white/10 pr-3">
+            <span className="text-xs">🕒</span>
+            <span className="text-xs font-mono font-bold tracking-tight text-white/90">
+              {time || '12:00:00'}
+            </span>
+          </div>
+        )}
+
+        {/* Konum */}
+        {showLocation && (
+          <div className="flex items-center gap-1.5 px-1">
+            <span className="text-xs">📍</span>
+            <span className="text-xs font-bold text-white/80">{location}</span>
+          </div>
+        )}
+
+        {/* Hava Durumu */}
+        {showWeather && (
+          <div className="flex items-center gap-1.5 pl-2 border-l border-white/10">
+            <span className="text-sm">{weather.icon}</span>
+            <span className="text-xs font-bold text-emerald-400 font-mono">{weather.temp}</span>
+          </div>
+        )}
       </div>
     </div>
   );
