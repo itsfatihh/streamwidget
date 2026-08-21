@@ -10,12 +10,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ isPlaying: false, message: 'No refresh token provided' }, { status: 400 });
   }
 
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  const clientId = process.env.SPOTIFY_CLIENT_ID || 'a5f826d0d1fe41bd9fcac0a4ff63f813';
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET || 'a71948dd3da04d38b13162defe34b52d';
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
   try {
-    // 1. Yeni Access Token al
     const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
@@ -34,7 +33,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ isPlaying: false }, { status: 200 });
     }
 
-    // 2. Currently Playing şarkıyı sorgula
     const playerRes = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
@@ -55,7 +53,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       isPlaying: songData.is_playing,
       title: songData.item.name,
-      artist: songData.item.artists?.map((a: any) => a.name).join(', ') || 'Unknown Artist',
+      artist: songData.item.artists?.map((a: any) => a.name).join(', ') || 'Bilinmeyen Sanatçı',
       album: songData.item.album?.name || '',
       albumArt: songData.item.album?.images?.[0]?.url || '',
       durationMs: songData.item.duration_ms,

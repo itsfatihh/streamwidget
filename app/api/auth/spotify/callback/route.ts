@@ -5,8 +5,8 @@ export async function GET(req: Request) {
   const code = searchParams.get('code');
   const channel = searchParams.get('state') || 'default';
 
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+  const clientId = process.env.SPOTIFY_CLIENT_ID || 'a5f826d0d1fe41bd9fcac0a4ff63f813';
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET || 'a71948dd3da04d38b13162defe34b52d';
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.streamwidget.live';
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
 
@@ -32,7 +32,6 @@ export async function GET(req: Request) {
     const tokenData = await tokenRes.json();
 
     if (tokenData.refresh_token) {
-      // Refresh token'ı builder sayfasına güvenli geri aktar
       return NextResponse.redirect(
         `${baseUrl}/builder/now-playing?channel=${encodeURIComponent(channel)}&refresh_token=${encodeURIComponent(
           tokenData.refresh_token
