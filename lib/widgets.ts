@@ -205,40 +205,67 @@ export const WIDGETS_LIST: WidgetDef[] = [
   },
   {
     id: "irl-hud",
+    name: { en: "IRL Stream HUD", tr: "IRL Canlı Yayın HUD", es: "HUD de Transmisión IRL", de: "IRL-Stream-HUD", pt: "HUD de Transmissão IRL", fr: "HUD de Stream IRL", ru: "IRL Стрим HUD" },
+    description: { en: "Real-time Live badge, clock, IP geolocation, and weather status.", tr: "Canlı saat, IP tabanlı konum, hava durumu ve canlı yayın durumu.", es: "Reloj en tiempo real, geolocalización por IP y clima.", de: "Echtzeituhr, IP-Geolokalisierung und Wetter.", pt: "Relógio em tempo real, geolocalização e clima.", fr: "Horloge en direct, géolocalisation et météo.", ru: "Часы в реальном времени, геолокация и погода." },
     category: "IRL",
-    name: {
-      en: "IRL Live Stream HUD",
-      tr: "IRL Canlı Yayın HUD",
-      es: "HUD de Transmisión IRL",
-      de: "IRL Live-Stream HUD",
-      pt: "HUD de Transmissão IRL",
-      fr: "HUD de Livestream IRL",
-      ru: "IRL Стрим HUD",
-    },
-    description: {
-      en: "Modular LIVE badge, clock, location, and live weather for outdoor streams.",
-      tr: "Dış mekan yayınları için modüler LIVE rozeti, saat, konum ve canlı hava durumu.",
-      es: "Insignia LIVE modular, reloj, ubicación y clima en vivo para exteriores.",
-      de: "Modulares LIVE-Badge, Uhrzeit, Standort und Live-Wetter für Outdoor-Streams.",
-      pt: "Emblema LIVE modular, relógio, localização e clima ao vivo.",
-      fr: "Badge LIVE modulaire, heure, localisation et météo en direct pour extérieur.",
-      ru: "Модульный значок LIVE, часы, локация и погода для стримов на улице.",
-    },
     fields: [
       {
-        name: "city",
-        label: { en: "City / Location", tr: "Şehir / Konum", es: "Ciudad", de: "Stadt", pt: "Cidade", fr: "Ville", ru: "Город" },
-        type: "text",
-        defaultValue: "Istanbul",
-        placeholder: "Istanbul",
+        name: "showLive",
+        label: { en: "LIVE Badge", tr: "LIVE Rozeti", es: "Insignia LIVE", de: "LIVE-Abzeichen", pt: "Distintivo LIVE", fr: "Badge LIVE", ru: "Значок LIVE" },
+        type: "select",
+        defaultValue: "true",
+        options: [
+          { label: { en: "Show", tr: "Açık", es: "Mostrar", de: "Anzeigen", pt: "Mostrar", fr: "Afficher", ru: "Показать" }, value: "true" },
+          { label: { en: "Hide", tr: "Kapalı", es: "Ocultar", de: "Ausblenden", pt: "Ocultar", fr: "Masquer", ru: "Скрыть" }, value: "false" }
+        ]
       },
       {
-        name: "accent",
-        label: { en: "Accent Color", tr: "Vurgu Rengi", es: "Color de acento", de: "Akzentfarbe", pt: "Cor de destaque", fr: "Couleur accent", ru: "Цвет акцента" },
-        type: "color",
-        defaultValue: "#53FC18",
+        name: "showClock",
+        label: { en: "Live Clock", tr: "Canlı Saat", es: "Reloj en Vivo", de: "Echtzeituhr", pt: "Relógio ao Vivo", fr: "Horloge en Direct", ru: "Живые часы" },
+        type: "select",
+        defaultValue: "true",
+        options: [
+          { label: { en: "Show", tr: "Açık", es: "Mostrar", de: "Anzeigen", pt: "Mostrar", fr: "Afficher", ru: "Показать" }, value: "true" },
+          { label: { en: "Hide", tr: "Kapalı", es: "Ocultar", de: "Ausblenden", pt: "Ocultar", fr: "Masquer", ru: "Скрыть" }, value: "false" }
+        ]
       },
-    ],
+      {
+        name: "showLocation",
+        label: { en: "Location", tr: "Konum (Şehir)", es: "Ubicación", de: "Standort", pt: "Localização", fr: "Emplacement", ru: "Локация" },
+        type: "select",
+        defaultValue: "true",
+        options: [
+          { label: { en: "Show", tr: "Açık", es: "Mostrar", de: "Anzeigen", pt: "Mostrar", fr: "Afficher", ru: "Показать" }, value: "true" },
+          { label: { en: "Hide", tr: "Kapalı", es: "Ocultar", de: "Ausblenden", pt: "Ocultar", fr: "Masquer", ru: "Скрыть" }, value: "false" }
+        ]
+      },
+      {
+        name: "showWeather",
+        label: { en: "Weather", tr: "Hava Durumu", es: "Clima", de: "Wetter", pt: "Clima", fr: "Météo", ru: "Погода" },
+        type: "select",
+        defaultValue: "true",
+        options: [
+          { label: { en: "Show", tr: "Açık", es: "Mostrar", de: "Anzeigen", pt: "Mostrar", fr: "Afficher", ru: "Показать" }, value: "true" },
+          { label: { en: "Hide", tr: "Kapalı", es: "Ocultar", de: "Ausblenden", pt: "Ocultar", fr: "Masquer", ru: "Скрыть" }, value: "false" }
+        ]
+      },
+      {
+        name: "city",
+        label: { en: "Custom City (Optional)", tr: "Özel Şehir (Opsiyonel)", es: "Ciudad personalizada", de: "Eigene Stadt (Optional)", pt: "Cidade personalizada", fr: "Ville personnalisée", ru: "Свой город" },
+        type: "text",
+        defaultValue: ""
+      },
+      {
+        name: "theme",
+        label: { en: "Theme Style", tr: "Tasarım Teması", es: "Tema", de: "Design-Stil", pt: "Estilo", fr: "Thème", ru: "Стиль" },
+        type: "select",
+        defaultValue: "framed",
+        options: [
+          { label: { en: "Framed Capsule", tr: "Çerçeveli Kapsül", es: "Cápsula enmarcada", de: "Kapsel mit Rahmen", pt: "Cápsula com Moldura", fr: "Capsule encadrée", ru: "Капсула в рамке" }, value: "framed" },
+          { label: { en: "Minimal Text", tr: "Sade Minimal", es: "Texto minimalista", de: "Minimaler Text", pt: "Texto minimalista", fr: "Texte minimaliste", ru: "Минимал текст" }, value: "minimal" }
+        ]
+      }
+    ]
   },
   {
     id: "mini-map",
