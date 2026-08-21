@@ -36,7 +36,6 @@ export default function BuilderPage() {
   const [lang, setLang] = useState('tr');
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
-  // Tarayıcıdan kayıtlı dil ve tema tercihini yükle
   useEffect(() => {
     const savedLang = localStorage.getItem('sw_lang');
     if (savedLang) setLang(savedLang);
@@ -115,9 +114,8 @@ export default function BuilderPage() {
           <span>{lang === 'tr' ? 'Tüm Widgetlar' : 'All Widgets'}</span>
         </Link>
 
-        {/* Sağ Kontroller: Dil ve Tema Butonları */}
+        {/* Sağ Kontroller */}
         <div className="flex items-center gap-3">
-          {/* 7 Dil Seçeneği */}
           <div className={`flex items-center p-1 rounded-xl border ${
             isDark ? 'bg-white/5 border-white/10' : 'bg-slate-200/70 border-slate-300'
           }`}>
@@ -136,7 +134,6 @@ export default function BuilderPage() {
             ))}
           </div>
 
-          {/* Aydınlık / Karanlık Mod Butonu */}
           <button
             onClick={toggleTheme}
             aria-label="Toggle Theme"
@@ -318,6 +315,53 @@ export default function BuilderPage() {
             {slug === 'now-playing' && <NowPlayingWidget searchParams={formValues} />}
             {slug === 'qr-tip' && <QrTipWidget searchParams={formValues} />}
           </div>
+
+          {/* IRL HUD Chat Komutları Kullanım Kılavuzu */}
+          {slug === 'irl-hud' && (
+            <div className={`rounded-3xl p-6 shadow-xl border flex flex-col gap-3.5 transition-colors ${
+              isDark ? 'bg-[#0b0e14]/90 border-white/10 text-white/80' : 'bg-white border-slate-200 text-slate-700 shadow-slate-200/50'
+            }`}>
+              <div className="flex items-center gap-2">
+                <span className="text-base">💬</span>
+                <span className={`text-xs font-black uppercase tracking-wider ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {lang === 'tr' ? 'Canlı Sohbet Komutları ile Yönetim' : 'Manage with Live Chat Commands'}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed opacity-90">
+                {lang === 'tr'
+                  ? 'Yayın esnasında widget panelini açmadan, Kick sohbetine yazacağınız komutlarla konumu ve hava durumunu anında güncelleyebilirsiniz (Yalnızca yayıncı ve moderatörler kullanabilir):'
+                  : 'You can update location and weather directly via Kick chat commands without opening the dashboard (Broadcaster & Mods only):'}
+              </p>
+
+              <div className="flex flex-col gap-2.5 pt-1">
+                <div className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                  isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <code className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-500 font-mono text-xs font-bold">
+                      !location &lt;Şehir&gt;
+                    </code>
+                  </div>
+                  <span className="text-[11px] font-medium opacity-80">
+                    {lang === 'tr' ? 'Örn: !location Berlin — Konumu ve hava durumunu o şehre eşitler.' : 'Ex: !location Berlin — Sets location and syncs live weather.'}
+                  </span>
+                </div>
+
+                <div className={`p-3 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                  isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <code className="px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-500 font-mono text-xs font-bold">
+                      !auto
+                    </code>
+                  </div>
+                  <span className="text-[11px] font-medium opacity-80">
+                    {lang === 'tr' ? 'Manuel şehri sıfırlar, tekrar otomatik IP konumuna ve hava durumuna döner.' : 'Resets manual city and returns to automatic IP geolocation.'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Token Rehberi (Sadece Now Playing için) */}
           {slug === 'now-playing' && (
