@@ -21,6 +21,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
   const showBadges = searchParams?.show_badges !== 'false';
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [statusText, setStatusText] = useState<string>(`Kick sohbeti aranıyor (${channel})...`);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   // Emote Parser: [emote:12345:emoteName] -> Inline Image
@@ -78,12 +79,17 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
         const data = await res.json();
         const chatroomId = data?.chatroom?.id || data?.chatroom_id;
 
-        if (!chatroomId || isCancelled) return;
+        if (!chatroomId) {
+          if (!isCancelled) setStatusText(`Kanal bulunamadı veya çevrimdışı (${channel})`);
+          return;
+        }
+
+        if (isCancelled) return;
+        setStatusText(`Sohbete bağlanıldı (${channel}) ✓`);
 
         ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f28308142977d07?protocol=7&client=js&version=7.6.0&flash=false');
 
         ws.onopen = () => {
-          // Chat odasına abone ol
           ws?.send(
             JSON.stringify({
               event: 'pusher:subscribe',
@@ -91,12 +97,11 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
             })
           );
 
-          // Canlı tutmak için 25 saniyede bir ping gönder
           pingInterval = setInterval(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
             }
-          }, 25000);
+          }, 20000);
         };
 
         ws.onmessage = (event) => {
@@ -116,7 +121,9 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
             setTimeout(initChat, 3000);
           }
         };
-      } catch (err) {}
+      } catch (err) {
+        if (!isCancelled) setStatusText(`Bağlantı hatası (${channel})`);
+      }
     }
 
     initChat();
@@ -142,7 +149,7 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
       <div className="flex flex-col gap-2 overflow-y-auto no-scrollbar">
         {messages.length === 0 && (
           <div className="text-white/40 text-xs italic px-3 py-2">
-            Kick sohbeti bekleniyor ({channel})...
+            {statusText}
           </div>
         )}
 
