@@ -257,9 +257,9 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
 
   useEffect(() => {
     let ws: WebSocket | null = null;
-    let pollInterval: any = null;
+    let pollTimer: any = null;
 
-    const connect = async () => {
+    const initConnection = async () => {
       try {
         const res = await fetch(`/api/kick/pinned?channel=${encodeURIComponent(channel)}`);
         if (!res.ok) return;
@@ -276,16 +276,18 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
         }
 
         const chatroomId = data.chatroom_id;
-        if (!chatroomId) return;
+        const channelId = data.channel_id;
 
         // Pusher soket bağlantısı
         ws = new WebSocket('wss://ws-us2.pusher.com/app/eb1d5f283081a78b932c?protocol=7&client=js&version=7.6.0&flash=false');
 
         ws.onopen = () => {
-          ws?.send(JSON.stringify({
-            event: 'pusher:subscribe',
-            data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
-          }));
+          if (chatroomId) {
+            ws?.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${chatroomId}.v2` } }));
+          }
+          if (channelId) {
+            ws?.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `channel.${channelId}` } }));
+          }
         };
 
         ws.onmessage = (event) => {
@@ -293,9 +295,20 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
             const parsed = JSON.parse(event.data);
             const ev = parsed.event || '';
 
-            if (ev.includes('ChatMessagePinned') || ev.includes('pinned')) {
+            if (
+              ev.includes('PinnedMessageCreated') ||
+              ev.includes('ChatMessagePinned') ||
+              ev.includes('PinnedMessage') ||
+              ev === 'pinned'
+            ) {
+              if (ev.includes('Deleted') || ev.includes('Unpin') || ev.includes('unpinned')) {
+                setPinned(null);
+                return;
+              }
+
               const payload = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
               const msg = payload.message || payload.pinned_message || payload;
+
               setPinned({
                 id: String(msg.id || Date.now()),
                 username: msg.sender?.username || msg.user?.username || 'Moderatör',
@@ -303,18 +316,22 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
                 color: msg.sender?.identity?.color || accent,
               });
               playPingSound();
-            } else if (ev.includes('ChatMessageUnpinned') || ev.includes('unpinned')) {
+            } else if (
+              ev.includes('PinnedMessageDeleted') ||
+              ev.includes('ChatMessageUnpinned') ||
+              ev.includes('UnpinnedMessage')
+            ) {
               setPinned(null);
             }
-          } catch (e) {}
+          } catch (err) {}
         };
-      } catch (e) {}
+      } catch (err) {}
     };
 
-    connect();
+    initConnection();
 
-    // Polling yedek kontrolü (her 4 saniyede bir)
-    pollInterval = setInterval(async () => {
+    // 4 saniyede bir yoklama
+    pollTimer = setInterval(async () => {
       try {
         const res = await fetch(`/api/kick/pinned?channel=${encodeURIComponent(channel)}`);
         if (!res.ok) return;
@@ -338,12 +355,12 @@ function KickPinnedWidget({ searchParams }: { searchParams: Record<string, strin
             return prev;
           });
         }
-      } catch (e) {}
+      } catch (err) {}
     }, 4000);
 
     return () => {
       if (ws) ws.close();
-      if (pollInterval) clearInterval(pollInterval);
+      if (pollTimer) clearInterval(pollTimer);
     };
   }, [channel]);
 
