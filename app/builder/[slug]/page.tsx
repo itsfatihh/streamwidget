@@ -28,7 +28,8 @@ function getWeatherIcon(code: number) {
 }
 
 export default function BuilderPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = use(params);
+  const { slug: rawSlug } = use(params);
+  const slug = normalizeSlug(rawSlug);
   const widget = WIDGETS_LIST.find((w) => w.id === slug);
 
   const [lang, setLang] = useState<LangCode>("tr");
