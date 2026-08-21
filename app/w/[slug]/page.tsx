@@ -344,7 +344,7 @@ function WidgetContent({ slug: rawSlug }: { slug: string }) {
       const res = await fetchChannelData();
 
       if (res?.chatroomId) {
-        pusher = new Pusher('32cbd69e4b950bf97679', {
+        pusher = new Pusher('eb1d5f283081a78b932c', {
           cluster: 'us2',
           forceTLS: true,
         });
