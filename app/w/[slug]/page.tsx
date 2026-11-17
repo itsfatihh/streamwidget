@@ -4,7 +4,6 @@ import IrlHudWidget from '@/components/widgets/IrlHud';
 import MiniMapWidget from '@/components/widgets/MiniMap';
 import FollowerGoalWidget from '@/components/widgets/FollowerGoal';
 import SubGoalWidget from '@/components/widgets/SubGoal';
-import GoalBarWidget from '@/components/widgets/GoalBar';
 import ChatOverlayWidget from '@/components/widgets/ChatOverlay';
 import SubCounterWidget from '@/components/widgets/SubCounter';
 import NowPlayingWidget from '@/components/widgets/NowPlaying';
@@ -33,7 +32,6 @@ export default async function WidgetRenderPage({
   if (slug === 'mini-map') return <MiniMapWidget searchParams={parsedParams} />;
   if (slug === 'follower-goal') return <FollowerGoalWidget searchParams={parsedParams} />;
   if (slug === 'sub-goal') return <SubGoalWidget searchParams={parsedParams} />;
-  if (slug === 'goal-bar') return <GoalBarWidget searchParams={parsedParams} />;
   if (slug === 'chat-overlay') return <ChatOverlayWidget searchParams={parsedParams} />;
   if (slug === 'sub-counter') return <SubCounterWidget searchParams={parsedParams} />;
   if (slug === 'now-playing') return <NowPlayingWidget searchParams={parsedParams} />;

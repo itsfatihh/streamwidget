@@ -17,6 +17,9 @@ export interface WidgetDef {
   description: Record<string, string>;
   category: string;
   fields: WidgetField[];
+  // When true, the widget is shown on the home grid as a disabled
+  // "Coming soon / Yakında" card and does not link to the builder.
+  comingSoon?: boolean;
 }
 
 export const WIDGETS_LIST: WidgetDef[] = [
@@ -89,6 +92,12 @@ export const WIDGETS_LIST: WidgetDef[] = [
         ]
       },
       {
+        name: "city",
+        label: { tr: "Şehir (Opsiyonel, boşsa IP)", en: "City (Optional, IP if empty)", de: "Stadt (Optional, sonst IP)", es: "Ciudad (Opcional, IP si vacío)", fr: "Ville (Optionnel, IP si vide)", pt: "Cidade (Opcional, IP se vazio)", ru: "Город (Опц., иначе по IP)" },
+        type: "text",
+        defaultValue: ""
+      },
+      {
         name: "theme",
         label: { tr: "Tasarım Teması", en: "Theme Style", de: "Design-Stil", es: "Estilo de Tema", fr: "Style de Thème", pt: "Estilo", ru: "Тема" },
         type: "select",
@@ -135,7 +144,18 @@ export const WIDGETS_LIST: WidgetDef[] = [
         defaultValue: "dark",
         options: [
           { label: { tr: "Karanlık Mod", en: "Dark Mode", de: "Dunkel", es: "Oscuro", fr: "Sombre", pt: "Escuro", ru: "Темная" }, value: "dark" },
-          { label: { tr: "Aydınlık Mod", en: "Light Mode", de: "Hell", es: "Claro", fr: "Clair", pt: "Claro", ru: "Светлая" }, value: "light" }
+          { label: { tr: "Aydınlık Mod", en: "Light Mode", de: "Hell", es: "Claro", fr: "Clair", pt: "Claro", ru: "Светлая" }, value: "light" },
+          { label: { tr: "Gece Mavisi", en: "Midnight", de: "Mitternacht", es: "Medianoche", fr: "Minuit", pt: "Meia-noite", ru: "Полночь" }, value: "midnight" }
+        ]
+      },
+      {
+        name: "shape",
+        label: { tr: "Harita Şekli", en: "Map Shape", de: "Kartenform", es: "Forma del Mapa", fr: "Forme de Carte", pt: "Forma do Mapa", ru: "Форма карты" },
+        type: "select",
+        defaultValue: "circle",
+        options: [
+          { label: { tr: "Daire", en: "Circle", de: "Kreis", es: "Círculo", fr: "Cercle", pt: "Círculo", ru: "Круг" }, value: "circle" },
+          { label: { tr: "Kare", en: "Square", de: "Quadrat", es: "Cuadrado", fr: "Carré", pt: "Quadrado", ru: "Квадрат" }, value: "square" }
         ]
       },
       {
@@ -281,6 +301,7 @@ export const WIDGETS_LIST: WidgetDef[] = [
       ru: "Отображает текущий трек Spotify с обложкой."
     },
     category: "MEDIA",
+    comingSoon: true,
     fields: [
       {
         name: "channel",
@@ -341,14 +362,104 @@ export const WIDGETS_LIST: WidgetDef[] = [
         defaultValue: "BAĞIŞ & DESTEK"
       },
       {
-        name: "theme",
-        label: { tr: "Tasarım Teması", en: "Theme Style", de: "Design", es: "Estilo", fr: "Thème", pt: "Tema", ru: "Тема" },
+        name: "color",
+        label: { tr: "QR Rengi", en: "QR Color", de: "QR-Farbe", es: "Color QR", fr: "Couleur QR", pt: "Cor do QR", ru: "Цвет QR" },
+        type: "color",
+        defaultValue: "#22c55e"
+      }
+    ]
+  },
+  {
+    id: "sub-counter",
+    name: {
+      tr: "Abone Sayacı",
+      en: "Sub Counter",
+      de: "Abo-Zähler",
+      es: "Contador de Subs",
+      fr: "Compteur d'Abonnés",
+      pt: "Contador de Inscritos",
+      ru: "Счётчик подписок"
+    },
+    description: {
+      tr: "Kick abone sayınızı canlı olarak şık bir rozet veya büyük sayaç şeklinde gösterir.",
+      en: "Shows your live Kick subscriber count as a badge or a large counter.",
+      de: "Zeigt Ihre Kick-Abonnentenzahl live als Badge oder großen Zähler.",
+      es: "Muestra tus suscriptores de Kick en vivo como insignia o contador grande.",
+      fr: "Affiche vos abonnés Kick en direct sous forme de badge ou de grand compteur.",
+      pt: "Mostra seus inscritos da Kick ao vivo como selo ou contador grande.",
+      ru: "Показывает число подписчиков Kick в виде значка или большого счётчика."
+    },
+    category: "ENGAGE",
+    fields: [
+      {
+        name: "channel",
+        label: { tr: "Kick Kanal Adı", en: "Kick Channel", de: "Kick-Kanal", es: "Canal Kick", fr: "Chaîne Kick", pt: "Canal Kick", ru: "Канал Kick" },
+        type: "text",
+        defaultValue: "itsfatih"
+      },
+      {
+        name: "style",
+        label: { tr: "Görünüm Stili", en: "Display Style", de: "Anzeigestil", es: "Estilo", fr: "Style d'Affichage", pt: "Estilo", ru: "Стиль" },
         type: "select",
-        defaultValue: "dark",
+        defaultValue: "badge",
         options: [
-          { label: { tr: "Karanlık Kapsül", en: "Dark Capsule", de: "Dunkel", es: "Cápsula Oscura", fr: "Sombre", pt: "Escuro", ru: "Темная" }, value: "dark" },
-          { label: { tr: "Aydınlık Kapsül", en: "Light Capsule", de: "Hell", es: "Cápsula Clara", fr: "Clair", pt: "Claro", ru: "Светлая" }, value: "light" }
+          { label: { tr: "Rozet", en: "Badge", de: "Badge", es: "Insignia", fr: "Badge", pt: "Selo", ru: "Значок" }, value: "badge" },
+          { label: { tr: "Büyük Sayaç", en: "Big Counter", de: "Großer Zähler", es: "Contador Grande", fr: "Grand Compteur", pt: "Contador Grande", ru: "Большой счётчик" }, value: "big" }
         ]
+      },
+      {
+        name: "color",
+        label: { tr: "Vurgu Rengi", en: "Accent Color", de: "Akzentfarbe", es: "Color de Acento", fr: "Couleur d'Accent", pt: "Cor de Destaque", ru: "Цвет акцента" },
+        type: "color",
+        defaultValue: "#a855f7"
+      }
+    ]
+  },
+  {
+    id: "sub-goal",
+    name: {
+      tr: "Abone Hedefi",
+      en: "Sub Goal",
+      de: "Abo-Ziel",
+      es: "Meta de Subs",
+      fr: "Objectif d'Abonnés",
+      pt: "Meta de Inscritos",
+      ru: "Цель подписок"
+    },
+    description: {
+      tr: "Kick abone sayınızı otomatik çeken ve hedefe doğru ilerleyen canlı çubuk.",
+      en: "Automatically tracks your Kick subscriber count with an animated goal bar.",
+      de: "Verfolgt automatisch Ihre Kick-Abonnentenzahl mit animiertem Zielbalken.",
+      es: "Rastrea tus suscriptores de Kick con una barra de meta animada.",
+      fr: "Suit automatiquement vos abonnés Kick avec une barre d'objectif animée.",
+      pt: "Acompanha seus inscritos da Kick com uma barra de meta animada.",
+      ru: "Автоматически отслеживает подписчиков Kick с анимированной полосой цели."
+    },
+    category: "ENGAGE",
+    fields: [
+      {
+        name: "channel",
+        label: { tr: "Kick Kanal Adı", en: "Kick Channel", de: "Kick-Kanal", es: "Canal Kick", fr: "Chaîne Kick", pt: "Canal Kick", ru: "Канал Kick" },
+        type: "text",
+        defaultValue: "itsfatih"
+      },
+      {
+        name: "target",
+        label: { tr: "Hedef Sayısı", en: "Target Goal", de: "Zielanzahl", es: "Objetivo", fr: "Cible", pt: "Meta", ru: "Цель" },
+        type: "text",
+        defaultValue: "50"
+      },
+      {
+        name: "title",
+        label: { tr: "Başlık Metni", en: "Title Text", de: "Titel", es: "Título", fr: "Titre", pt: "Título", ru: "Заголовок" },
+        type: "text",
+        defaultValue: "ABONE HEDEFİ"
+      },
+      {
+        name: "bar_color",
+        label: { tr: "Bar Rengi", en: "Bar Color", de: "Balkenfarbe", es: "Color de Barra", fr: "Couleur de Barre", pt: "Cor da Barra", ru: "Цвет полосы" },
+        type: "color",
+        defaultValue: "#00e701"
       }
     ]
   }

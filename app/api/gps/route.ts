@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 
-// Global bellek deposu
+// Global bellek deposu (process içi, geçici).
+// NOT: Vercel serverless ortamında her instance kendi belleğini tutar; kalıcı
+// ve instance'lar arası tutarlı GPS için ileride Upstash Redis / Vercel KV
+// eklenmelidir (future work, şu an uygulanmadı — kullanıcı DB istemedi).
 declare global {
   var __STREAMWIDGET_GPS_STORE__: Record<string, { lat: number; lng: number; speed: number; heading: number; updatedAt: number }> | undefined;
 }
@@ -36,9 +39,12 @@ export async function GET(req: Request) {
 
   const data = store[key];
   if (!data) {
+    // Henüz veri yok: varsayılan konum. MiniMap `lon` okur; telefon vericisi
+    // `lng` POST eder. İki alanı da aynı değerle döndür.
     return NextResponse.json({
       lat: 49.4875,
       lng: 8.4660,
+      lon: 8.4660,
       speed: 0,
       heading: 0,
       status: 'waiting',
@@ -47,6 +53,8 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     ...data,
+    // MiniMap `data.lon` okur, store `lng` tutar: ikisini de aynı değerle ver.
+    lon: data.lng,
     status: Date.now() - data.updatedAt < 10000 ? 'live' : 'stale',
   });
 }

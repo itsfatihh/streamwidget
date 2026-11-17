@@ -11,8 +11,8 @@ const isEnabled = (val: any, defaultVal = true): boolean => {
 export default function MiniMapWidget({ searchParams }: { searchParams: Record<string, any> }) {
   const channel = (searchParams?.channel || 'itsfatih').toLowerCase().trim();
   const zoom = parseInt(searchParams?.zoom || '16', 10);
-  const mapTheme = searchParams?.mapTheme || 'dark';
-  const showSpeed = isEnabled(searchParams?.showSpeed, true);
+  const mapTheme = searchParams?.theme || 'dark';
+  const showSpeed = isEnabled(searchParams?.show_speed, true);
   const shape = searchParams?.shape || 'circle';
 
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);

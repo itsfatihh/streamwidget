@@ -19,6 +19,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
   const showLocation = parseBool('show_location', 'location');
   const showWeather = parseBool('show_weather', 'weather');
   const theme = searchParams?.theme || 'capsule';
+  const city = (searchParams?.city || '').trim();
 
   const [time, setTime] = useState<string>('');
   const [location, setLocation] = useState<string>('Yükleniyor...');
@@ -49,7 +50,8 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
 
     async function fetchWeather() {
       try {
-        const res = await fetch('/api/weather', { cache: 'no-store' });
+        const weatherUrl = city ? `/api/weather?city=${encodeURIComponent(city)}` : '/api/weather';
+        const res = await fetch(weatherUrl, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
           if (!isCancelled) {
@@ -70,7 +72,7 @@ export default function IrlHudWidget({ searchParams }: { searchParams: Record<st
       isCancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [city]);
 
   // Hiçbir öğe seçili değilse boş göster
   if (!showBadge && !showClock && !showLocation && !showWeather) {

@@ -70,17 +70,29 @@ export default function HomePage() {
             </div>
 
             <div className="pt-6 mt-4 border-t flex justify-end" style={{ borderColor: 'var(--border-color)' }}>
-              <Link
-                href={`/builder/${w.id}`}
-                className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 hover:bg-emerald-500 hover:text-black"
-                style={{
-                  backgroundColor: 'var(--bg-input)',
-                  color: 'var(--text-main)',
-                }}
-              >
-                <span>{t.customize}</span>
-                <span>→</span>
-              </Link>
+              {w.comingSoon ? (
+                <span
+                  className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 opacity-60 cursor-not-allowed"
+                  style={{
+                    backgroundColor: 'var(--bg-input)',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  <span>{lang === 'tr' ? 'Yakında' : 'Coming soon'}</span>
+                </span>
+              ) : (
+                <Link
+                  href={`/builder/${w.id}`}
+                  className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 hover:bg-emerald-500 hover:text-black"
+                  style={{
+                    backgroundColor: 'var(--bg-input)',
+                    color: 'var(--text-main)',
+                  }}
+                >
+                  <span>{t.customize}</span>
+                  <span>→</span>
+                </Link>
+              )}
             </div>
           </div>
         ))}

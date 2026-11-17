@@ -8,7 +8,6 @@ import IrlHudWidget from '@/components/widgets/IrlHud';
 import MiniMapWidget from '@/components/widgets/MiniMap';
 import FollowerGoalWidget from '@/components/widgets/FollowerGoal';
 import SubGoalWidget from '@/components/widgets/SubGoal';
-import GoalBarWidget from '@/components/widgets/GoalBar';
 import ChatOverlayWidget from '@/components/widgets/ChatOverlay';
 import SubCounterWidget from '@/components/widgets/SubCounter';
 import NowPlayingWidget from '@/components/widgets/NowPlaying';
@@ -309,7 +308,6 @@ export default function BuilderPage() {
             {slug === 'mini-map' && <MiniMapWidget searchParams={formValues} />}
             {slug === 'follower-goal' && <FollowerGoalWidget searchParams={formValues} />}
             {slug === 'sub-goal' && <SubGoalWidget searchParams={formValues} />}
-            {slug === 'goal-bar' && <GoalBarWidget searchParams={formValues} />}
             {slug === 'chat-overlay' && <ChatOverlayWidget searchParams={formValues} />}
             {slug === 'sub-counter' && <SubCounterWidget searchParams={formValues} />}
             {slug === 'now-playing' && <NowPlayingWidget searchParams={formValues} />}
