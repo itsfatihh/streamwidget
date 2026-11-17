@@ -10,7 +10,7 @@ const isEnabled = (val: any, defaultVal = true): boolean => {
 
 export default function MiniMapWidget({ searchParams }: { searchParams: Record<string, any> }) {
   const channel = (searchParams?.channel || 'itsfatih').toLowerCase().trim();
-  const zoom = parseInt(searchParams?.zoom || '16', 10);
+  const zoom = parseInt(searchParams?.zoom || '15', 10);
   const mapTheme = searchParams?.theme || 'dark';
   const showSpeed = isEnabled(searchParams?.show_speed, true);
   const shape = searchParams?.shape || 'circle';
@@ -88,7 +88,9 @@ export default function MiniMapWidget({ searchParams }: { searchParams: Record<s
         const gpsRes = await fetch(`/api/gps?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (gpsRes.ok) {
           const data = await gpsRes.json();
-          if (data?.lat && data?.lon && !isCancelled) {
+          // 'waiting' = henüz konum gelmedi: sahte bir yer göstermemek için
+          // koordinatları yok say ve bekleme durumunda kal.
+          if (data?.status !== 'waiting' && data?.lat && data?.lon && !isCancelled) {
             const lat = parseFloat(data.lat);
             const lon = parseFloat(data.lon);
             setCoords({ lat, lon });

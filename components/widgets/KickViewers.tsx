@@ -8,25 +8,36 @@ export default function KickViewersWidget({ searchParams }: { searchParams: Reco
   const [isLive, setIsLive] = useState<boolean>(false);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    // Kick resmi API'si tarayıcıdan Cloudflare'a takıldığı için sunucu tarafı
+    // /api/kick scraping yolunu kullanıyoruz (uygulamanın geri kalanıyla tutarlı).
     const fetchStats = async () => {
       try {
-        const res = await fetch(`https://kick.com/api/v2/channels/${channel}/livestream`);
+        const res = await fetch(`/api/kick?channel=${encodeURIComponent(channel)}`, { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.data) {
-            setViewers(data.data.viewers || 0);
-            setIsLive(true);
-            return;
+          if (!isCancelled) {
+            setIsLive(Boolean(data.is_live));
+            setViewers(typeof data.viewers === 'number' ? data.viewers : 0);
           }
+          return;
         }
+      } catch {
+        // Ağ/scrape hatasında güvenli varsayılana düş, hiçbir zaman çökme.
+      }
+      if (!isCancelled) {
         setIsLive(false);
-      } catch (e) {
-        setIsLive(false);
+        setViewers(0);
       }
     };
+
     fetchStats();
     const interval = setInterval(fetchStats, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
   }, [channel]);
 
   return (

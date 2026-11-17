@@ -390,6 +390,12 @@ export const WIDGETS_LIST: WidgetDef[] = [
       ru: "Показывает число подписчиков Kick в виде значка или большого счётчика."
     },
     category: "ENGAGE",
+    // Kick'in herkese açık kanal HTML'i abone sayısını yayınlamıyor; resmi Kick
+    // API'si de yok (kullanıcıda developer uygulaması yok). Dolayısıyla bu widget
+    // gerçek veri üretemez ve 0'da takılır. Sahte/0 sayaç yayınlamak yerine
+    // now-playing gibi "Yakında" olarak gizlendi (abone verisi erişilebilir
+    // olduğunda comingSoon kaldırılabilir).
+    comingSoon: true,
     fields: [
       {
         name: "channel",
@@ -436,6 +442,10 @@ export const WIDGETS_LIST: WidgetDef[] = [
       ru: "Автоматически отслеживает подписчиков Kick с анимированной полосой цели."
     },
     category: "ENGAGE",
+    // Bkz. sub-counter: abone sayısı Kick public HTML'inde yok, resmi API da
+    // yok. Gerçek veri gelmediği için hedef çubuğu 0'da kalır; now-playing gibi
+    // "Yakında" olarak gizlendi.
+    comingSoon: true,
     fields: [
       {
         name: "channel",
@@ -460,6 +470,130 @@ export const WIDGETS_LIST: WidgetDef[] = [
         label: { tr: "Bar Rengi", en: "Bar Color", de: "Balkenfarbe", es: "Color de Barra", fr: "Couleur de Barre", pt: "Cor da Barra", ru: "Цвет полосы" },
         type: "color",
         defaultValue: "#00e701"
+      }
+    ]
+  },
+  {
+    id: "kick-viewers",
+    name: {
+      tr: "Canlı İzleyici Sayısı",
+      en: "Live Viewer Count",
+      de: "Live-Zuschauerzahl",
+      es: "Contador de Espectadores",
+      fr: "Nombre de Spectateurs",
+      pt: "Contador de Espectadores",
+      ru: "Счётчик зрителей"
+    },
+    description: {
+      tr: "Kick kanalınızın anlık izleyici sayısını ve canlı durumunu şık bir rozette gösterir.",
+      en: "Shows your Kick channel's live viewer count and online status in a sleek badge.",
+      de: "Zeigt die Live-Zuschauerzahl und den Status Ihres Kick-Kanals in einem Badge.",
+      es: "Muestra el número de espectadores en vivo y el estado de tu canal de Kick.",
+      fr: "Affiche le nombre de spectateurs en direct et le statut de votre chaîne Kick.",
+      pt: "Mostra o número de espectadores ao vivo e o status do seu canal Kick.",
+      ru: "Показывает количество зрителей и статус вашего канала Kick."
+    },
+    category: "ENGAGE",
+    fields: [
+      {
+        name: "channel",
+        label: { tr: "Kick Kanal Adı", en: "Kick Channel", de: "Kick-Kanal", es: "Canal Kick", fr: "Chaîne Kick", pt: "Canal Kick", ru: "Канал Kick" },
+        type: "text",
+        defaultValue: "itsfatih"
+      }
+    ]
+  },
+  {
+    id: "stream-uptime",
+    name: {
+      tr: "Yayın Süresi",
+      en: "Stream Uptime",
+      de: "Stream-Laufzeit",
+      es: "Tiempo de Transmisión",
+      fr: "Durée du Stream",
+      pt: "Tempo de Transmissão",
+      ru: "Время эфира"
+    },
+    description: {
+      tr: "Yayınınızın ne kadar süredir açık olduğunu canlı HH:MM:SS sayacıyla gösterir. Yayın kapalıyken çevrimdışı gösterir.",
+      en: "Shows how long your stream has been live with a running HH:MM:SS counter. Displays offline when not streaming.",
+      de: "Zeigt mit einem laufenden HH:MM:SS-Zähler, wie lange Ihr Stream live ist.",
+      es: "Muestra cuánto tiempo lleva en vivo tu transmisión con un contador HH:MM:SS.",
+      fr: "Affiche depuis combien de temps votre stream est en direct avec un compteur HH:MM:SS.",
+      pt: "Mostra há quanto tempo sua transmissão está ao vivo com um contador HH:MM:SS.",
+      ru: "Показывает длительность эфира счётчиком ЧЧ:ММ:СС."
+    },
+    category: "IRL",
+    fields: [
+      {
+        name: "channel",
+        label: { tr: "Kick Kanal Adı", en: "Kick Channel", de: "Kick-Kanal", es: "Canal Kick", fr: "Chaîne Kick", pt: "Canal Kick", ru: "Канал Kick" },
+        type: "text",
+        defaultValue: "itsfatih"
+      }
+    ]
+  },
+  {
+    id: "social-banner",
+    name: {
+      tr: "Sosyal Medya Bandı",
+      en: "Social Banner",
+      de: "Social-Media-Banner",
+      es: "Banner Social",
+      fr: "Bannière Sociale",
+      pt: "Banner Social",
+      ru: "Соцсети Баннер"
+    },
+    description: {
+      tr: "Sosyal medya hesaplarınızı dönüşümlü olarak gösteren, API gerektirmeyen şık bir alt bant. Her yayıncıda çalışır.",
+      en: "A clean lower-third strip that cycles through your social handles. No API needed, works for everyone.",
+      de: "Ein sauberes Lower-Third-Banner, das Ihre Social-Media-Handles durchläuft. Keine API nötig.",
+      es: "Una franja inferior que rota tus redes sociales. Sin API, funciona para todos.",
+      fr: "Une bande inférieure qui fait défiler vos réseaux sociaux. Sans API, fonctionne pour tous.",
+      pt: "Uma faixa inferior que alterna suas redes sociais. Sem API, funciona para todos.",
+      ru: "Нижняя плашка, которая перебирает ваши соцсети. Без API, работает у всех."
+    },
+    category: "ENGAGE",
+    fields: [
+      {
+        name: "label",
+        label: { tr: "Etiket Metni", en: "Label Text", de: "Beschriftung", es: "Texto de Etiqueta", fr: "Texte du Label", pt: "Texto do Rótulo", ru: "Текст метки" },
+        type: "text",
+        defaultValue: "TAKİP ET"
+      },
+      {
+        name: "social_1",
+        label: { tr: "1. Hesap", en: "Handle 1", de: "Konto 1", es: "Cuenta 1", fr: "Compte 1", pt: "Conta 1", ru: "Аккаунт 1" },
+        type: "text",
+        defaultValue: "@kullaniciadi"
+      },
+      {
+        name: "social_2",
+        label: { tr: "2. Hesap (Opsiyonel)", en: "Handle 2 (Optional)", de: "Konto 2 (Optional)", es: "Cuenta 2 (Opcional)", fr: "Compte 2 (Optionnel)", pt: "Conta 2 (Opcional)", ru: "Аккаунт 2 (Опц.)" },
+        type: "text",
+        defaultValue: ""
+      },
+      {
+        name: "social_3",
+        label: { tr: "3. Hesap (Opsiyonel)", en: "Handle 3 (Optional)", de: "Konto 3 (Optional)", es: "Cuenta 3 (Opcional)", fr: "Compte 3 (Optionnel)", pt: "Conta 3 (Opcional)", ru: "Аккаунт 3 (Опц.)" },
+        type: "text",
+        defaultValue: ""
+      },
+      {
+        name: "theme",
+        label: { tr: "Tasarım Teması", en: "Theme Style", de: "Design-Stil", es: "Estilo", fr: "Thème", pt: "Tema", ru: "Тема" },
+        type: "select",
+        defaultValue: "dark",
+        options: [
+          { label: { tr: "Karanlık", en: "Dark", de: "Dunkel", es: "Oscuro", fr: "Sombre", pt: "Escuro", ru: "Тёмная" }, value: "dark" },
+          { label: { tr: "Aydınlık", en: "Light", de: "Hell", es: "Claro", fr: "Clair", pt: "Claro", ru: "Светлая" }, value: "light" }
+        ]
+      },
+      {
+        name: "color",
+        label: { tr: "Vurgu Rengi", en: "Accent Color", de: "Akzentfarbe", es: "Color de Acento", fr: "Couleur d'Accent", pt: "Cor de Destaque", ru: "Цвет акцента" },
+        type: "color",
+        defaultValue: "#53FC18"
       }
     ]
   }

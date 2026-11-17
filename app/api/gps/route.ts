@@ -39,12 +39,14 @@ export async function GET(req: Request) {
 
   const data = store[key];
   if (!data) {
-    // Henüz veri yok: varsayılan konum. MiniMap `lon` okur; telefon vericisi
-    // `lng` POST eder. İki alanı da aynı değerle döndür.
+    // Henüz veri yok: KOORDİNAT DÖNDÜRME. Eskiden Mannheim (49.4875, 8.4660)
+    // gibi gerçek görünen sahte bir konum dönüyordu ve MiniMap bunu canlı konum
+    // sanıp yayında yanlış yer gösteriyordu. Artık sadece 'waiting' durumu döner;
+    // MiniMap koordinat gelmediği sürece "GPS bekleniyor" rozetinde kalır.
     return NextResponse.json({
-      lat: 49.4875,
-      lng: 8.4660,
-      lon: 8.4660,
+      lat: null,
+      lng: null,
+      lon: null,
       speed: 0,
       heading: 0,
       status: 'waiting',
