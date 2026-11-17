@@ -10,8 +10,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ isPlaying: false, message: 'No refresh token provided' }, { status: 400 });
   }
 
-  const clientId = process.env.SPOTIFY_CLIENT_ID || 'a5f826d0d1fe41bd9fcac0a4ff63f813';
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET || 'a71948dd3da04d38b13162defe34b52d';
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+
+  // Kimlik bilgileri tanımlı değilse OAuth'u denemeden kibarca devre dışı bırak.
+  if (!clientId || !clientSecret) {
+    return NextResponse.json({ isPlaying: false, disabled: true }, { status: 200 });
+  }
+
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
   try {

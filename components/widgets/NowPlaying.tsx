@@ -13,18 +13,17 @@ export default function NowPlayingWidget({ searchParams }: { searchParams: Recor
     albumArt?: string;
     progressMs?: number;
     durationMs?: number;
+    disabled?: boolean;
   }>({
     isPlaying: false,
   });
+  const [disabled, setDisabled] = useState(false);
 
   useEffect(() => {
+    // Token yoksa Spotify entegrasyonu şu an kullanılamıyor: sahte parça gösterme,
+    // bunun yerine "yakında" durumunu göster.
     if (!refreshToken) {
-      setTrack({
-        isPlaying: true,
-        title: 'Örnek Parça',
-        artist: 'Sanatçı Adı',
-        albumArt: '',
-      });
+      setDisabled(true);
       return;
     }
 
@@ -38,6 +37,11 @@ export default function NowPlayingWidget({ searchParams }: { searchParams: Recor
         if (res.ok) {
           const data = await res.json();
           if (!isCancelled) {
+            if (data?.disabled) {
+              setDisabled(true);
+              return;
+            }
+            setDisabled(false);
             setTrack(data);
           }
         }
@@ -52,6 +56,21 @@ export default function NowPlayingWidget({ searchParams }: { searchParams: Recor
       clearInterval(interval);
     };
   }, [refreshToken]);
+
+  // Entegrasyon devre dışı / token yok: zarif "yakında" kartı.
+  if (disabled) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center p-4 bg-transparent select-none font-sans">
+        <div className="bg-[#0b0e14]/95 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.8)] flex items-center gap-3 max-w-sm">
+          <span className="text-xl">🎵</span>
+          <div className="flex flex-col">
+            <span className="text-[9px] font-mono font-black uppercase tracking-widest text-[#1DB954]">SPOTIFY</span>
+            <span className="text-sm font-extrabold text-white">Yakında / Coming soon</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!track.isPlaying && refreshToken) {
     return null; // Şarkı çalmıyorsa gizle

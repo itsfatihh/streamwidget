@@ -3,10 +3,15 @@ import { NextResponse } from 'next/server';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const channel = searchParams.get('channel') || 'default';
-  
-  // Ortam değişkeni yoksa doğrudan App ID'yi kullan
-  const clientId = process.env.SPOTIFY_CLIENT_ID || 'a5f826d0d1fe41bd9fcac0a4ff63f813';
+
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.streamwidget.live';
+
+  // Kimlik bilgisi yoksa OAuth akışını başlatma; builder'a devre dışı bayrağıyla dön.
+  if (!clientId) {
+    return NextResponse.redirect(`${baseUrl}/builder/now-playing?error=spotify_disabled`);
+  }
+
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
 
   const scope = 'user-read-currently-playing user-read-playback-state';

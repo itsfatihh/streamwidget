@@ -5,10 +5,15 @@ export async function GET(req: Request) {
   const code = searchParams.get('code');
   const channel = searchParams.get('state') || 'default';
 
-  const clientId = process.env.SPOTIFY_CLIENT_ID || 'a5f826d0d1fe41bd9fcac0a4ff63f813';
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET || 'a71948dd3da04d38b13162defe34b52d';
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.streamwidget.live';
   const redirectUri = `${baseUrl}/api/auth/spotify/callback`;
+
+  // Kimlik bilgileri yoksa token değişimini denemeden devre dışı bayrağıyla dön.
+  if (!clientId || !clientSecret) {
+    return NextResponse.redirect(`${baseUrl}/builder/now-playing?error=spotify_disabled`);
+  }
 
   if (!code) {
     return NextResponse.redirect(`${baseUrl}/builder/now-playing?error=auth_failed`);

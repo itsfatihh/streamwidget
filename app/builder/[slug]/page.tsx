@@ -8,11 +8,13 @@ import IrlHudWidget from '@/components/widgets/IrlHud';
 import MiniMapWidget from '@/components/widgets/MiniMap';
 import FollowerGoalWidget from '@/components/widgets/FollowerGoal';
 import SubGoalWidget from '@/components/widgets/SubGoal';
-import GoalBarWidget from '@/components/widgets/GoalBar';
 import ChatOverlayWidget from '@/components/widgets/ChatOverlay';
 import SubCounterWidget from '@/components/widgets/SubCounter';
 import NowPlayingWidget from '@/components/widgets/NowPlaying';
 import QrTipWidget from '@/components/widgets/QrTip';
+import KickViewersWidget from '@/components/widgets/KickViewers';
+import StreamUptimeWidget from '@/components/widgets/StreamUptime';
+import SocialBannerWidget from '@/components/widgets/SocialBanner';
 
 const LANGUAGES = [
   { code: 'tr', label: 'TR' },
@@ -77,6 +79,32 @@ export default function BuilderPage() {
         <h1 className="text-2xl font-black mb-4">Widget Bulunamadı</h1>
         <Link href="/" className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all">
           Ana Sayfaya Dön
+        </Link>
+      </div>
+    );
+  }
+
+  // "Yakında" olarak işaretli widget'lar (now-playing, sub-counter, sub-goal)
+  // ana sayfada gizli; ancak doğrudan /builder/<slug> linkiyle hâlâ erişilebilir.
+  // Bu widget'lar henüz gerçek veri üretemediği için (Spotify kimlik bilgisi yok,
+  // Kick abone sayısı erişilemez) çıkmaz sokak olan "Bağlan" akışı yerine bir
+  // bilgilendirme ekranı gösteriyoruz.
+  if (widget.comingSoon) {
+    return (
+      <div className={`min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center ${themeMode === 'dark' ? 'bg-[#07090e] text-white' : 'bg-slate-50 text-slate-900'}`}>
+        <span className="text-[10px] font-mono font-black uppercase tracking-widest px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20">
+          {lang === 'tr' ? 'Yakında' : 'Coming soon'}
+        </span>
+        <h1 className="text-2xl font-black tracking-tight">
+          {widget.name[lang] || widget.name['tr']}
+        </h1>
+        <p className={`text-sm max-w-md leading-relaxed ${themeMode === 'dark' ? 'text-white/60' : 'text-slate-500'}`}>
+          {lang === 'tr'
+            ? 'Bu widget henüz hazır değil ve şu anda kullanılamıyor. Hazır olduğunda ana sayfada görünecek.'
+            : 'This widget is not ready yet and is currently unavailable. It will appear on the home page once it is ready.'}
+        </p>
+        <Link href="/" className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-bold rounded-xl transition-all">
+          {lang === 'tr' ? 'Ana Sayfaya Dön' : 'Back to Home'}
         </Link>
       </div>
     );
@@ -309,11 +337,13 @@ export default function BuilderPage() {
             {slug === 'mini-map' && <MiniMapWidget searchParams={formValues} />}
             {slug === 'follower-goal' && <FollowerGoalWidget searchParams={formValues} />}
             {slug === 'sub-goal' && <SubGoalWidget searchParams={formValues} />}
-            {slug === 'goal-bar' && <GoalBarWidget searchParams={formValues} />}
             {slug === 'chat-overlay' && <ChatOverlayWidget searchParams={formValues} />}
             {slug === 'sub-counter' && <SubCounterWidget searchParams={formValues} />}
             {slug === 'now-playing' && <NowPlayingWidget searchParams={formValues} />}
             {slug === 'qr-tip' && <QrTipWidget searchParams={formValues} />}
+            {slug === 'kick-viewers' && <KickViewersWidget searchParams={formValues} />}
+            {slug === 'stream-uptime' && <StreamUptimeWidget searchParams={formValues} />}
+            {slug === 'social-banner' && <SocialBannerWidget searchParams={formValues} />}
           </div>
 
           {/* IRL HUD Chat Komutları Kullanım Kılavuzu */}

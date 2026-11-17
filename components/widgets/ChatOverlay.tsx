@@ -9,8 +9,6 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
   const showBadges = searchParams?.show_badges !== 'false';
 
   const [messages, setMessages] = useState<any[]>([]);
-  const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const [statusText, setStatusText] = useState<string>(`Oda ID aranıyor (${channel})...`);
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const renderMessageContent = (content: string) => {
@@ -56,30 +54,19 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
         const pusherKey = data?.pusher_key || 'eb1d5f28308142977d07';
 
         if (!chatroomId) {
-          if (!isCancelled) setStatusText(`Kanal gizli veya bulunamadı (${channel})`);
           return;
         }
 
         if (isCancelled) return;
-        setStatusText(`Bağlanılıyor... (Anahtar: ${pusherKey.slice(0, 5)}...)`);
 
         // Dinamik Pusher Key ile bağlantı
         ws = new WebSocket(`wss://ws-us2.pusher.com/app/${pusherKey}?protocol=7&client=js&version=7.6.0&flash=false`);
 
-        ws.onopen = () => {
-          setStatusText(`Soket açıldı, Pusher bekleniyor...`);
-        };
-
         ws.onmessage = (event) => {
           try {
             const parsed = JSON.parse(event.data);
-            
-            if (parsed.event !== 'pusher:pong') {
-                setDebugLogs((prev) => [...prev.slice(-3), `GELEN: ${parsed.event}`]);
-            }
 
             if (parsed.event === 'pusher:connection_established') {
-              setStatusText(`Pusher onayladı, odaya giriliyor...`);
               ws?.send(
                 JSON.stringify({
                   event: 'pusher:subscribe',
@@ -93,11 +80,6 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
               return;
             }
 
-            if (parsed.event === 'pusher_internal:subscription_succeeded') {
-              setStatusText(`Sohbete bağlanıldı ✓`);
-              setDebugLogs((prev) => [...prev.slice(-3), `BAŞARILI: Abone olundu!`]);
-            }
-
             if (parsed.data) {
               const msgData = typeof parsed.data === 'string' ? JSON.parse(parsed.data) : parsed.data;
               if (msgData && msgData.content && msgData.sender) {
@@ -107,15 +89,14 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
           } catch (e) {}
         };
 
-        ws.onclose = (e) => {
+        ws.onclose = () => {
           if (!isCancelled) {
-            const code = e.code;
-            setStatusText(`Koptu (Hata Kodu: ${code})`);
+            // Bağlantı koptuğunda sessizce yeniden dene.
             reconnectTimer = setTimeout(initChat, 5000);
           }
         };
       } catch (err) {
-        if (!isCancelled) setStatusText(`API Hatası (${channel})`);
+        // Sessizce yut; bir sonraki denemede tekrar bağlanmaya çalışılır.
       }
     }
 
@@ -130,29 +111,13 @@ export default function ChatOverlayWidget({ searchParams }: { searchParams: Reco
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, debugLogs]);
+  }, [messages]);
 
   const isLight = theme === 'light';
 
   return (
     <div className="w-full h-full flex flex-col justify-end p-4 overflow-hidden bg-transparent select-none font-sans" style={{ fontSize: `${fontSize}px` }}>
       <div className="flex flex-col gap-2 overflow-y-auto no-scrollbar">
-        
-        <div className="text-emerald-400 text-xs font-bold px-3 py-2 bg-black/80 rounded-xl border border-emerald-500/30">
-          {statusText}
-        </div>
-
-        {debugLogs.length > 0 && (
-          <div className="flex flex-col gap-1 mt-1 mb-2">
-            <span className="text-yellow-400 text-[9px] font-black tracking-widest uppercase">Teşhis Logları:</span>
-            {debugLogs.map((log, i) => (
-              <div key={i} className="text-[10px] font-mono text-white/70 bg-blue-900/40 border border-blue-500/30 p-1.5 rounded break-words">
-                {log}
-              </div>
-            ))}
-          </div>
-        )}
-
         {messages.map((msg, index) => (
           <div key={msg.id || index} className={`flex flex-wrap items-center gap-1.5 px-3 py-1.5 rounded-xl border backdrop-blur-md shadow-md animate-[fadeIn_0.2s_ease-out] ${isLight ? 'bg-white/90 border-black/5 text-slate-900 shadow-slate-200/50' : 'bg-[#0b0e14]/90 border-white/10 text-white shadow-black/40'}`}>
             {showBadges && msg.sender?.identity?.badges && (
